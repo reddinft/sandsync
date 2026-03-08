@@ -1,0 +1,23 @@
+bucket_definitions:
+  user_stories:
+    # Each user gets their own bucket containing their stories
+    # Stories sync to client devices via PowerSync as agents generate chapters
+    parameters:
+      - name: user_id
+        type: text
+
+    data:
+      - table: stories
+        filter: "user_id = bucket.user_id"
+
+      - table: story_chapters
+        filter: |
+          story_id IN (
+            SELECT id FROM stories WHERE user_id = bucket.user_id
+          )
+
+      - table: agent_events
+        filter: |
+          story_id IN (
+            SELECT id FROM stories WHERE user_id = bucket.user_id
+          )

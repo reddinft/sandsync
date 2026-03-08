@@ -1,0 +1,21 @@
+{
+  "name": "@sandsync/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@mastra/core": "^0.10.0",
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/bun": "latest"
+  }
+}
