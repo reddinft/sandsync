@@ -305,10 +305,7 @@ Score below 7.5 means the draft needs revision. Be honest and rigorous.`;
 
           // Use generateLegacy() — Ogma uses ollama-ai-provider (AI SDK v4 compat)
         // Added timeout for potentially slow qwen3:4b model
-        const ogmaResult = await Promise.race([
-          ogma.generateLegacy(ogmaPrompt),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Ogma call timed out')), 60000))
-        ]);
+        const ogmaResult = await ogma.generateLegacy(ogmaPrompt);
         const ogmaLatency = Date.now() - ogmaT0;
         totalOgmaLatency += ogmaLatency;
 

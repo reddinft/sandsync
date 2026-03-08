@@ -49,5 +49,5 @@ Output format:
 
 You are precise but not pedantic. You improve without erasing. Anansi's voice must survive your review.`,
 
-  model: ollama("qwen3:4b"),
+  model: ollama("qwen2.5:latest"),
 });
