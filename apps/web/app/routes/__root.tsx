@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Outlet,
   ScrollRestoration,
@@ -13,17 +13,21 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
   useEffect(() => {
     // Connect to PowerSync backend
     const connectDb = async () => {
       try {
         await (powerSyncDatabase as any).connect();
-      } catch (err) {
+        setConnectionError(null);
+      } catch (err: any) {
         console.error("Failed to connect PowerSync:", err);
+        setConnectionError(err?.message || "Failed to connect to sync service");
       }
     };
     connectDb();
-    
+
     return () => {
       powerSyncDatabase.disconnect().catch(console.error);
     };
@@ -44,6 +48,12 @@ function RootComponent() {
         <div className="star star-9" />
         <div className="star star-10" />
 
+        {connectionError && (
+          <div className="relative z-20 bg-rose-900/80 border-b border-rose-500/50 px-6 py-2 text-sm text-rose-200 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Sync connection failed: {connectionError}. Working offline with local cache.</span>
+          </div>
+        )}
         <header className="border-b border-amber-200/10 px-6 py-4 bg-slate-900/50 backdrop-blur-md relative z-10">
           <nav className="mx-auto max-w-4xl flex items-center justify-between">
             <a href="/" className="text-xl font-bold tracking-tight text-amber-100">

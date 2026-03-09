@@ -13,7 +13,8 @@ const ollama = createOllama({
  * and beauty of language. In SandSync, Ogma reviews Anansi's drafts for
  * language quality, cultural authenticity, and narrative polish.
  *
- * Runs on qwen3:4b via local Ollama — the "local-first" prize track entry.
+ * Runs on the model specified by OLLAMA_MODEL env var (default: qwen2.5:latest)
+ * via local Ollama — the "local-first" prize track entry.
  * Zero API cost, private inference, works offline.
  *
  * Voice: Irish accent, precise and scholarly
@@ -50,5 +51,5 @@ Output format:
 
 You are precise but not pedantic. You improve without erasing. Anansi's voice must survive your review. Reject generic writing — demand authenticity.`,
 
-  model: ollama("qwen2.5:latest"),
+  model: ollama(process.env.OLLAMA_MODEL || "qwen2.5:latest"),
 });

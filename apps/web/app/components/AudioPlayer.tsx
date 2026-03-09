@@ -106,6 +106,14 @@ export function AudioPlayer({ src, chapterTitle }: AudioPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  if (!src) {
+    return (
+      <div className="bg-slate-800/60 backdrop-blur rounded-xl border border-amber-200/20 px-5 py-4">
+        <p className="text-xs text-amber-200/40">Audio not available</p>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="bg-slate-800/60 backdrop-blur rounded-xl border border-amber-200/20 px-5 py-4">

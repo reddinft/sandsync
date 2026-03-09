@@ -4,6 +4,7 @@
  */
 
 import * as fs from "fs";
+import { writeFile } from "fs/promises";
 import * as path from "path";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -47,24 +48,38 @@ export async function generateImageFromPrompt(prompt: string): Promise<string> {
 
   console.log(`[Imagen] Generating image from prompt (${prompt.length} chars)...`);
 
-  const response = await fetch(IMAGEN_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${GEMINI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      instances: [
-        {
-          prompt,
-        },
-      ],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: "4:3",
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  let response: Response;
+  try {
+    response = await fetch(IMAGEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
       },
-    }),
-  });
+      body: JSON.stringify({
+        instances: [
+          {
+            prompt,
+          },
+        ],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: "4:3",
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") {
+      throw new Error("Image generation timed out");
+    }
+    throw err;
+  }
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -105,13 +120,13 @@ export async function saveImageBase64(
 
   const imagePath = path.join(imageDir, `chapter_${chapterNumber}.png`);
   const imageBuffer = Buffer.from(base64Image, "base64");
-  fs.writeFileSync(imagePath, imageBuffer);
+  await writeFile(imagePath, imageBuffer);
 
-  // Return data: URL for inline embedding in responses
-  const dataUrl = `data:image/png;base64,${base64Image}`;
+  // Return relative URL served by the static /images/* handler
+  const relativeUrl = `/images/${storyId}/chapter_${chapterNumber}.png`;
   console.log(`[Imagen] Saved: ${imagePath}`);
 
-  return dataUrl;
+  return relativeUrl;
 }
 
 /**

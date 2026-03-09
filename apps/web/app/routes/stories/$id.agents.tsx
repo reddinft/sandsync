@@ -51,7 +51,7 @@ function AgentDebugPage() {
 
   // Parse and enrich events
   const events = (rawEvents || []).map((e: any) => {
-    const payload = typeof e.payload === "string" ? JSON.parse(e.payload) : e.payload;
+    const payload = typeof e.payload === "string" ? (() => { try { return JSON.parse(e.payload); } catch { return {}; } })() : (e.payload ?? {});
     return {
       ...e,
       payload,

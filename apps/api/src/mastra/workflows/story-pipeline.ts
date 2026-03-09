@@ -14,6 +14,7 @@
 import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
 import * as fs from "fs";
+import { writeFile } from "fs/promises";
 import * as path from "path";
 import { papaBois, anansi, ogma } from "../index";
 import { generateNarration, estimateCost } from "../../services/elevenlabs";
@@ -406,7 +407,7 @@ Return ONLY valid JSON with the same structure as before.`;
           );
           fs.mkdirSync(audioDir, { recursive: true });
           const audioPath = path.join(audioDir, `chapter_${chapterNum}.mp3`);
-          fs.writeFileSync(audioPath, narration.audioBuffer);
+          await writeFile(audioPath, narration.audioBuffer);
           audioUrl = `/audio/${storyId}/chapter_${chapterNum}.mp3`;
 
           deviTrace = {

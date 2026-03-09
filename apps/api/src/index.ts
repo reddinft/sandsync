@@ -232,6 +232,26 @@ const server = Bun.serve({
         return await handleGetAudio(audioMatch[1], parseInt(audioMatch[2]), corsHeaders);
       }
 
+      // GET /images/* — serve generated chapter illustrations from disk
+      const imagesMatch = pathname.match(/^\/images\/(.+\.png)$/);
+      if (imagesMatch && method === "GET") {
+        const imageDir = process.env.IMAGE_DIR || require("path").join(process.cwd(), "images");
+        const imagePath = require("path").join(imageDir, imagesMatch[1]);
+        try {
+          const file = await Bun.file(imagePath).arrayBuffer();
+          return new Response(file, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=3600",
+              ...corsHeaders,
+            },
+          });
+        } catch {
+          return notFound(corsHeaders);
+        }
+      }
+
       return notFound(corsHeaders);
     } catch (err: any) {
       console.error("[Server] Unhandled error:", err.message);

@@ -57,6 +57,29 @@ function StoryReaderPage() {
     devi: { completed: false },
     imagen: { completed: false },
   });
+  const [pollStatus, setPollStatus] = useState<{
+    status?: string;
+    chapters_complete?: number;
+    total_chapters?: number;
+  } | null>(null);
+
+  // Poll /stories/:id/status every 2s when PowerSync is offline
+  useEffect(() => {
+    if (syncStatus.connected) return;
+    const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiUrl}/stories/${id}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          setPollStatus(data);
+        }
+      } catch {
+        // ignore fetch errors while offline
+      }
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [syncStatus.connected, id]);
 
   // Update agent statuses when events change
   useEffect(() => {
@@ -68,7 +91,7 @@ function StoryReaderPage() {
         if (!processedAgents.has(event.agent)) {
           processedAgents.add(event.agent);
           const isCompleted = event.event_type === "completed";
-          const payload = typeof event.payload === "string" ? JSON.parse(event.payload) : event.payload;
+          const payload = typeof event.payload === "string" ? (() => { try { return JSON.parse(event.payload); } catch { return {}; } })() : (event.payload ?? {});
           statuses[event.agent] = {
             completed: isCompleted,
             latency: payload?.latency_ms || payload?.duration_ms,
@@ -95,9 +118,13 @@ function StoryReaderPage() {
     );
   }
 
-  const isGenerating = story.status !== "complete";
-  const completedAgents = Object.values(agentStatuses).filter(s => s.completed).length;
-  const totalAgents = Object.keys(agentStatuses).length;
+  const isGenerating = (pollStatus?.status ?? story.status) !== "complete";
+  const completedAgents = !syncStatus.connected && pollStatus
+    ? (pollStatus.chapters_complete ?? 0)
+    : Object.values(agentStatuses).filter(s => s.completed).length;
+  const totalAgents = !syncStatus.connected && pollStatus
+    ? (pollStatus.total_chapters ?? Object.keys(agentStatuses).length)
+    : Object.keys(agentStatuses).length;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 md:space-y-12">
