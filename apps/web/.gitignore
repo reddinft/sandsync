@@ -1,0 +1,4 @@
+
+# PowerSync pre-built worker files (copied from node_modules at setup time)
+public/powersync-worker/
+public/worker/

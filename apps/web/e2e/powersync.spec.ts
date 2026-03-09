@@ -10,16 +10,19 @@ test.describe("Feature: PowerSync Real-time Sync", () => {
     });
 
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
-    // Let PowerSync initialize
+    // Use domcontentloaded instead of networkidle — PowerSync keeps persistent connections alive
+    await page.waitForLoadState("domcontentloaded");
+    // Wait for the app title to appear (confirms React mounted)
+    await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
 
     // Filter out expected dev warnings
     const criticalErrors = consoleErrors.filter(
       (e) =>
         !e.includes("Warning:") &&
         !e.includes("Download the React DevTools") &&
-        !e.includes("Failed to fetch") // Expected when API not running
+        !e.includes("Failed to fetch") && // Expected when API not running
+        !e.includes("WebSocket") && // PowerSync WS connection attempts in dev
+        !e.includes("net::ERR") // Network errors from PowerSync connecting
     );
 
     expect(criticalErrors).toHaveLength(0);
@@ -27,17 +30,12 @@ test.describe("Feature: PowerSync Real-time Sync", () => {
 
   test("local SQLite database is accessible", async ({ page }) => {
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(3000);
-    // Let PowerSync WASM initialize
+    // Wait for app to render (confirms PowerSync schema init didn't crash)
+    await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
 
-    // Evaluate PowerSync status in the browser
-    const isReady = await page.evaluate(async () => {
-      // PowerSync attaches to window in dev mode
-      return (
-        (document.querySelector("[data-powersync-ready]") !== null) ||
-        document.body.innerText.includes("Stories from the Spirit World")
-      );
+    // Evaluate: page is rendered = local SQLite schema loaded without crash
+    const isReady = await page.evaluate(() => {
+      return document.body.innerText.includes("Stories from the Spirit World");
     });
 
     expect(isReady).toBe(true);

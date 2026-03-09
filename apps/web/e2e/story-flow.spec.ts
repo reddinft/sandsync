@@ -11,12 +11,13 @@ test.describe("Feature: Home Page", () => {
   }) => {
     await given("the user navigates to the home page", async () => {
       await page.goto("/");
+      await page.waitForLoadState("domcontentloaded");
     });
 
     await then("the page title is visible", async () => {
       await expect(
         page.getByText("Stories from the Spirit World")
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 10000 });
     });
 
     await then("the story request form is visible", async () => {
@@ -27,8 +28,11 @@ test.describe("Feature: Home Page", () => {
     await then("the genre selector has Caribbean folklore options", async () => {
       const select = page.locator("select");
       await expect(select).toBeVisible();
-      // Check for Anansi option
-      await expect(select.locator("option").first()).toBeVisible();
+      // Verify Anansi option exists in the select (options aren't "visible" per Playwright — check value)
+      const options = await select.locator("option").count();
+      expect(options).toBeGreaterThan(0);
+      const firstOption = await select.locator("option").first().textContent();
+      expect(firstOption).toContain("Anansi");
     });
   });
 
@@ -118,7 +122,8 @@ test.describe("Feature: Offline Badge", () => {
   }) => {
     await given("the user is on the home page", async () => {
       await page.goto("/");
-      await page.waitForLoadState("networkidle");
+      // Use domcontentloaded — PowerSync keeps persistent connections, never reaches networkidle
+      await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
     });
 
     await when("the network is disconnected", async () => {
