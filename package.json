@@ -4,6 +4,11 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "bun run --filter '*' dev",
-    "build": "bun run --filter '*' build"
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test",
+    "test:e2e": "cd apps/web && bun run test:e2e",
+    "test:api": "cd apps/api && bun run test",
+    "deploy:api": "cd apps/api && flyctl deploy --remote-only",
+    "deploy:web": "cd apps/web && vercel --prod"
   }
 }
