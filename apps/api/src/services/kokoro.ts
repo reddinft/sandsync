@@ -74,7 +74,7 @@ export async function uploadKokoroAudio(
         "Content-Type": "audio/wav",
         "x-upsert": "true",
       },
-      body: audioBuffer,
+      body: audioBuffer as unknown as BodyInit,
     }
   );
 

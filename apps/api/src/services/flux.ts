@@ -98,7 +98,7 @@ export async function uploadFluxImage(
         "Content-Type": "image/png",
         "x-upsert": "true",
       },
-      body: imageBuffer,
+      body: imageBuffer as unknown as BodyInit,
     }
   );
 

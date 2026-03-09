@@ -68,7 +68,7 @@ export async function retryAudioUpgrades() {
               "Content-Type": "audio/mpeg",
               "x-upsert": "true",
             },
-            body: narration.audioBuffer,
+            body: narration.audioBuffer as unknown as BodyInit,
           }
         );
 
