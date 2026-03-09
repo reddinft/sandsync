@@ -1,8 +1,6 @@
-"use client";
-
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { usePowerSync } from "@powersync/react";
+import { useState } from "react";
+import { useQuery } from "@powersync/react";
 import { Story } from "../lib/powersync";
 
 export const Route = createFileRoute("/")({
@@ -28,40 +26,12 @@ const LENGTHS = [
 
 function HomePage() {
   const navigate = useNavigate();
-  const db = usePowerSync();
-  const [stories, setStories] = useState<Story[]>([]);
+  const { data: stories } = useQuery<Story>("SELECT * FROM stories ORDER BY created_at DESC");
   const [genre, setGenre] = useState(GENRES[0]);
   const [length, setLength] = useState("medium");
   const [theme, setTheme] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  // Load stories from local PowerSync database
-  useEffect(() => {
-    const loadStories = async () => {
-      try {
-        const results = await db.getAll(
-          "SELECT * FROM stories ORDER BY created_at DESC"
-        );
-        setStories(results as Story[]);
-      } catch (err) {
-        console.error("Failed to load stories:", err);
-      }
-    };
-
-    loadStories();
-
-    // Watch for changes in the stories table
-    const unsubscribe = db.watch(
-      "SELECT * FROM stories ORDER BY created_at DESC",
-      [],
-      (updated) => {
-        setStories(updated as Story[]);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [db]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +39,10 @@ function HomePage() {
     setError("");
 
     try {
+      // @ts-ignore - VITE_API_URL is provided by Vite
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3002";
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/stories`,
+        `${apiUrl}/stories`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -187,7 +159,7 @@ function HomePage() {
         <h2 className="text-lg font-semibold text-amber-200">
           📖 Recent Stories
         </h2>
-        {stories.length === 0 ? (
+        {!stories || stories.length === 0 ? (
           <div className="bg-amber-950/30 border border-amber-800/20 rounded-xl px-5 py-4 text-sm text-amber-400/60">
             No stories yet. Request one to get started.
           </div>

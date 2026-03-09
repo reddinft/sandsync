@@ -1,9 +1,7 @@
-"use client";
-
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { usePowerSync } from "@powersync/react";
-import { AgentEvent } from "../lib/powersync";
+import { useQuery } from "@powersync/react";
+import { AgentEvent } from "../../lib/powersync";
 
 export const Route = createFileRoute("/stories/$id/agents")({
   component: AgentDebugPage,
@@ -34,51 +32,13 @@ const AGENT_STYLES: Record<string, { color: string; icon: string; label: string 
 
 function AgentDebugPage() {
   const { id } = Route.useParams();
-  const db = usePowerSync();
-  const [events, setEvents] = useState<AgentEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rawEvents } = useQuery<any>("SELECT * FROM agent_events WHERE story_id = ? ORDER BY created_at ASC", [id]);
 
-  // Load and watch agent events
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const results = await db.getAll(
-          "SELECT * FROM agent_events WHERE story_id = ? ORDER BY created_at ASC",
-          [id]
-        );
-        setEvents(
-          results.map((e: any) => ({
-            ...e,
-            payload:
-              typeof e.payload === "string" ? JSON.parse(e.payload) : e.payload,
-          })) as AgentEvent[]
-        );
-        setLoading(false);
-      } catch (err) {
-        console.error("Failed to load agent events:", err);
-        setLoading(false);
-      }
-    };
-
-    loadEvents();
-
-    // Watch for changes in agent events
-    const unsubscribe = db.watch(
-      "SELECT * FROM agent_events WHERE story_id = ? ORDER BY created_at ASC",
-      [id],
-      (updated) => {
-        setEvents(
-          (updated as any[]).map((e) => ({
-            ...e,
-            payload:
-              typeof e.payload === "string" ? JSON.parse(e.payload) : e.payload,
-          })) as AgentEvent[]
-        );
-      }
-    );
-
-    return () => unsubscribe();
-  }, [db, id]);
+  // Parse payloads
+  const events = (rawEvents || []).map((e: any) => ({
+    ...e,
+    payload: typeof e.payload === "string" ? JSON.parse(e.payload) : e.payload,
+  })) as AgentEvent[];
 
   // Build summary stats
   const agentStats = Object.keys(AGENT_STYLES).map((agent) => {
@@ -133,9 +93,7 @@ function AgentDebugPage() {
         <h2 className="text-sm font-semibold text-amber-400/80 uppercase tracking-wider">
           Event Timeline
         </h2>
-        {loading ? (
-          <p className="text-amber-400/60 text-sm">Loading events...</p>
-        ) : events.length === 0 ? (
+        {events.length === 0 ? (
           <div className="bg-amber-950/30 border border-amber-800/20 rounded-xl px-5 py-4 text-sm text-amber-400/60">
             No agent events yet.
           </div>

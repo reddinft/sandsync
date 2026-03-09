@@ -14,14 +14,11 @@
     "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/postcss": "^4.2.1",
     "@tanstack/react-router": "^1.166.3",
-    "@tanstack/react-router-server": "^1.31.24",
     "@tanstack/router-devtools": "^1.166.3",
-    "@tanstack/router-vite-plugin": "1.94.1",
-    "@tanstack/start": "1.94.1",
+    "@tanstack/router-vite-plugin": "^1.166.3",
     "@vitejs/plugin-react": "^5.1.4",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "vinxi": "0.3.0"
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

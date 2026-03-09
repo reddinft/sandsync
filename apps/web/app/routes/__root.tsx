@@ -1,5 +1,4 @@
-"use client";
-
+import { useEffect } from "react";
 import {
   Outlet,
   ScrollRestoration,
@@ -14,6 +13,22 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  useEffect(() => {
+    // Connect to PowerSync backend
+    const connectDb = async () => {
+      try {
+        await (powerSyncDatabase as any).connect();
+      } catch (err) {
+        console.error("Failed to connect PowerSync:", err);
+      }
+    };
+    connectDb();
+    
+    return () => {
+      powerSyncDatabase.disconnect().catch(console.error);
+    };
+  }, []);
+
   return (
     <PowerSyncContext.Provider value={powerSyncDatabase}>
       <div className="min-h-screen bg-gradient-to-b from-amber-950 to-stone-900 text-amber-50">
@@ -32,6 +47,7 @@ function RootComponent() {
         </main>
       </div>
       <ScrollRestoration />
+      {/* @ts-ignore - DEV is provided by Vite */}
       {import.meta.env.DEV && <TanStackRouterDevtools />}
     </PowerSyncContext.Provider>
   );
