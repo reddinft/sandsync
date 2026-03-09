@@ -1,5 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+"use client";
+
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { usePowerSync } from "@powersync/react";
+import { Story } from "../lib/powersync";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -22,36 +26,73 @@ const LENGTHS = [
   { value: "long", label: "Long (7 chapters)" },
 ];
 
-// Mock recent stories for offline-first demo
-const MOCK_STORIES = [
-  {
-    id: "1",
-    title: "The Spider and the River Goddess",
-    genre: "Anansi trickster tale",
-    status: "complete",
-    created_at: "2026-03-08T10:00:00Z",
-  },
-  {
-    id: "2",
-    title: "The Old Man of Moruga Forest",
-    genre: "Papa Bois forest spirit",
-    status: "generating",
-    created_at: "2026-03-08T14:30:00Z",
-  },
-];
-
 function HomePage() {
+  const navigate = useNavigate();
+  const db = usePowerSync();
+  const [stories, setStories] = useState<Story[]>([]);
   const [genre, setGenre] = useState(GENRES[0]);
   const [length, setLength] = useState("medium");
   const [theme, setTheme] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Load stories from local PowerSync database
+  useEffect(() => {
+    const loadStories = async () => {
+      try {
+        const results = await db.getAll(
+          "SELECT * FROM stories ORDER BY created_at DESC"
+        );
+        setStories(results as Story[]);
+      } catch (err) {
+        console.error("Failed to load stories:", err);
+      }
+    };
+
+    loadStories();
+
+    // Watch for changes in the stories table
+    const unsubscribe = db.watch(
+      "SELECT * FROM stories ORDER BY created_at DESC",
+      [],
+      (updated) => {
+        setStories(updated as Story[]);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [db]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    // TODO: POST to /api/stories — Papa Bois will orchestrate
-    console.log("Story request:", { genre, length, theme });
-    setTimeout(() => setSubmitting(false), 2000);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/stories`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            genre,
+            theme: theme || undefined,
+            length,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as { id: string };
+      // Navigate to the new story
+      navigate({ to: `/stories/${data.id}` });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create story");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -73,6 +114,12 @@ function HomePage() {
           🕷️ Request a Story
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/30 border border-red-700/50 rounded-lg px-4 py-2 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm text-amber-400/80 mb-1">
               Folklore Genre
@@ -140,33 +187,45 @@ function HomePage() {
         <h2 className="text-lg font-semibold text-amber-200">
           📖 Recent Stories
         </h2>
-        <div className="space-y-2">
-          {MOCK_STORIES.map((story) => (
-            <a
-              key={story.id}
-              href={`/stories/${story.id}`}
-              className="block bg-amber-950/30 border border-amber-800/20 rounded-xl px-5 py-4 hover:border-amber-700/50 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-amber-100">{story.title}</div>
-                  <div className="text-sm text-amber-400/60 mt-0.5">
-                    {story.genre}
+        {stories.length === 0 ? (
+          <div className="bg-amber-950/30 border border-amber-800/20 rounded-xl px-5 py-4 text-sm text-amber-400/60">
+            No stories yet. Request one to get started.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {stories.map((story) => (
+              <a
+                key={story.id}
+                href={`/stories/${story.id}`}
+                className="block bg-amber-950/30 border border-amber-800/20 rounded-xl px-5 py-4 hover:border-amber-700/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-amber-100">{story.title}</div>
+                    <div className="text-sm text-amber-400/60 mt-0.5">
+                      {story.genre}
+                    </div>
                   </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      story.status === "complete"
+                        ? "bg-green-900/50 text-green-400"
+                        : story.status === "failed"
+                        ? "bg-red-900/50 text-red-400"
+                        : "bg-amber-900/50 text-amber-400"
+                    }`}
+                  >
+                    {story.status === "complete"
+                      ? "✓ Complete"
+                      : story.status === "failed"
+                      ? "✗ Failed"
+                      : "⟳ Generating"}
+                  </span>
                 </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    story.status === "complete"
-                      ? "bg-green-900/50 text-green-400"
-                      : "bg-amber-900/50 text-amber-400"
-                  }`}
-                >
-                  {story.status === "complete" ? "✓ Complete" : "⟳ Generating"}
-                </span>
-              </div>
-            </a>
-          ))}
-        </div>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
