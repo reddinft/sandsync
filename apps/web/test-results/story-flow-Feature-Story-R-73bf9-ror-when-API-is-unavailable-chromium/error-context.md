@@ -1,0 +1,50 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - navigation [ref=e5]:
+        - link "🌴 SandSync" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e7]: Caribbean Folklore AI · PowerSync Hackathon 2026
+    - main [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - heading "Summon a Story" [level=1] [ref=e11]
+          - paragraph [ref=e12]: Generate AI tales woven from Trinidad & Tobago folklore. Where Anansi spins, Papa Bois guides, and spirits whisper.
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: What type of tale calls to you?
+            - generic [ref=e18]:
+              - button "🕷️ Anansi trickster tale" [ref=e19]
+              - button "🌳 Papa Bois forest spirit" [ref=e20]
+              - button "🔥 Soucouyant mystery" [ref=e21]
+              - button "👠 La Diablesse encounter" [ref=e22]
+              - button "🐺 Lagahoo shapeshifter" [ref=e23]
+              - button "🐍 Mama Dlo river spirit" [ref=e24]
+              - button "👣 Douen children spirits" [ref=e25]
+              - button "🌲 Silk cotton tree legend" [ref=e26]
+            - paragraph [ref=e27]: Each folklore spirit has its own flavor of tale.
+          - generic [ref=e28]:
+            - generic [ref=e29]: What should this tale explore?
+            - textbox "A clever merchant outwitting a spirit... A love tested by trickery... A hunter's test..." [ref=e30]
+            - generic [ref=e31]:
+              - paragraph [ref=e32]: Be specific. Spirits respond to intention.
+              - generic [ref=e33]: 0/200
+          - button "Summon the Story" [ref=e34]
+        - generic [ref=e35]:
+          - heading "Recent Tales" [level=2] [ref=e36]
+          - generic [ref=e37]:
+            - paragraph [ref=e38]: 🕸️
+            - paragraph [ref=e39]: No tales have been summoned yet — the web is empty, waiting to be spun.
+            - paragraph [ref=e40]: Create one above to see your stories appear here.
+  - generic:
+    - contentinfo:
+      - button "Open TanStack Router Devtools" [ref=e41] [cursor=pointer]:
+        - generic [ref=e42]:
+          - img [ref=e44]
+          - img [ref=e79]
+        - generic [ref=e113]: "-"
+        - generic [ref=e114]: TanStack Router
+```

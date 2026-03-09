@@ -31,30 +31,33 @@ function RootComponent() {
 
   return (
     <PowerSyncContext.Provider value={powerSyncDatabase}>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 text-amber-50 relative overflow-hidden">
-        {/* Twinkling stars background */}
-        <div className="star star-1" />
-        <div className="star star-2" />
-        <div className="star star-3" />
-        <div className="star star-4" />
-        <div className="star star-5" />
-        <div className="star star-6" />
-        <div className="star star-7" />
-        <div className="star star-8" />
-        <div className="star star-9" />
-        <div className="star star-10" />
+      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-900 to-slate-900 text-amber-100 relative overflow-hidden">
+        {/* Firefly dots background — animated amber floaters */}
+        <div className="firefly firefly-1" />
+        <div className="firefly firefly-2" />
+        <div className="firefly firefly-3" />
+        <div className="firefly firefly-4" />
+        <div className="firefly firefly-5" />
+        <div className="firefly firefly-6" />
+        <div className="firefly firefly-7" />
+        <div className="firefly firefly-8" />
+        <div className="firefly firefly-9" />
+        <div className="firefly firefly-10" />
 
-        <header className="border-b border-amber-200/10 px-6 py-4 bg-slate-900/50 backdrop-blur-md relative z-10">
-          <nav className="mx-auto max-w-4xl flex items-center justify-between">
-            <a href="/" className="text-xl font-bold tracking-tight text-amber-100">
+        {/* Header with glass effect */}
+        <header className="border-b border-indigo-700/50 px-6 py-4 bg-slate-900/50 backdrop-blur-md relative z-10">
+          <nav className="mx-auto max-w-6xl flex items-center justify-between">
+            <a href="/" className="text-2xl font-bold tracking-tight text-amber-100 hover:text-amber-200 transition-colors">
               🌴 SandSync
             </a>
             <span className="text-xs text-amber-200/60">
-              Caribbean Folklore AI · PowerSync AI Hackathon 2026
+              Caribbean Folklore AI · PowerSync Hackathon 2026
             </span>
           </nav>
         </header>
-        <main className="mx-auto max-w-4xl px-6 py-8 relative z-10">
+
+        {/* Main content area */}
+        <main className="mx-auto max-w-6xl px-6 py-8 relative z-10">
           <Outlet />
         </main>
       </div>
