@@ -48,7 +48,7 @@ test.describe("Feature: Home Page", () => {
 });
 
 test.describe("Feature: Story Request Form", () => {
-  test("allows selecting a genre and story length", async ({ page }) => {
+  test("allows selecting a genre (story length is hardcoded to short)", async ({ page }) => {
     await given("the user is on the home page", async () => {
       await page.goto("/");
     });
@@ -57,17 +57,15 @@ test.describe("Feature: Story Request Form", () => {
       await page.locator("select").selectOption("Papa Bois forest spirit");
     });
 
-    await when("they select short story length", async () => {
-      await page.getByText("Short (3 chapters)").click();
-    });
-
-    await then("the selections are reflected in the form", async () => {
+    await then("the genre selection is reflected in the form", async () => {
       await expect(page.locator("select")).toHaveValue(
         "Papa Bois forest spirit"
       );
-      // Short button should be highlighted
-      const shortBtn = page.getByText("Short (3 chapters)");
-      await expect(shortBtn).toHaveClass(/bg-amber-500/);
+    });
+
+    await then("the story length selector is not visible", async () => {
+      // Length selector was removed in Task 1 — stories are hardcoded to 3 chapters
+      await expect(page.getByText(/Story Length|Medium|Long/)).not.toBeVisible();
     });
   });
 
