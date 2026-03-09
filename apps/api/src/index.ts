@@ -6,9 +6,10 @@
  * then PowerSync handles real-time sync of chapters as agents complete them.
  *
  * Endpoints:
- *   POST /stories          — create story, kick off pipeline async
- *   GET  /stories/:id/status — poll story status
- *   GET  /health           — health check (Mastra, Supabase, Ollama)
+ *   POST /stories                          — create story, kick off pipeline async
+ *   GET  /stories/:id/status               — poll story status
+ *   GET  /stories/:id/chapters/:n/audio    — serve chapter audio file (CORS enabled)
+ *   GET  /health                           — health check (Mastra, Supabase, Ollama)
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -28,34 +29,37 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Response helpers ───────────────────────────────────────────────────────────
 
-function json(data: unknown, status = 200) {
+function json(data: unknown, status = 200, corsHeaders?: Record<string, string>) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      ...(corsHeaders || {}),
+    },
   });
 }
 
-function notFound() {
-  return json({ error: "Not found" }, 404);
+function notFound(corsHeaders?: Record<string, string>) {
+  return json({ error: "Not found" }, 404, corsHeaders);
 }
 
-function badRequest(msg: string) {
-  return json({ error: msg }, 400);
+function badRequest(msg: string, corsHeaders?: Record<string, string>) {
+  return json({ error: msg }, 400, corsHeaders);
 }
 
 // ── Handlers ───────────────────────────────────────────────────────────────────
 
-async function handlePostStory(req: Request): Promise<Response> {
+async function handlePostStory(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
   let body: { userId?: string; request?: string };
   try {
     body = await req.json();
   } catch {
-    return badRequest("Invalid JSON body");
+    return badRequest("Invalid JSON body", corsHeaders);
   }
 
   const { userId, request: userRequest } = body;
-  if (!userId) return badRequest("userId is required");
-  if (!userRequest) return badRequest("request is required");
+  if (!userId) return badRequest("userId is required", corsHeaders);
+  if (!userRequest) return badRequest("request is required", corsHeaders);
 
   // Create story row (status: queued)
   const { data: story, error } = await supabase
@@ -66,7 +70,7 @@ async function handlePostStory(req: Request): Promise<Response> {
 
   if (error || !story) {
     console.error("[POST /stories] DB error:", error?.message);
-    return json({ error: "Failed to create story" }, 500);
+    return json({ error: "Failed to create story" }, 500, corsHeaders);
   }
 
   const storyId = story.id;
@@ -92,17 +96,17 @@ async function handlePostStory(req: Request): Promise<Response> {
     }
   })();
 
-  return json({ storyId }, 201);
+  return json({ storyId }, 201, corsHeaders);
 }
 
-async function handleGetStoryStatus(storyId: string): Promise<Response> {
+async function handleGetStoryStatus(storyId: string, corsHeaders: Record<string, string>): Promise<Response> {
   const { data: story, error } = await supabase
     .from("stories")
     .select("id, status, title")
     .eq("id", storyId)
     .single();
 
-  if (error || !story) return notFound();
+  if (error || !story) return notFound(corsHeaders);
 
   // Count completed chapters
   const { count } = await supabase
@@ -127,10 +131,10 @@ async function handleGetStoryStatus(storyId: string): Promise<Response> {
     title: story.title,
     chapters_complete: count ?? 0,
     total_chapters: totalChapters,
-  });
+  }, 200, corsHeaders);
 }
 
-async function handleHealth(): Promise<Response> {
+async function handleHealth(corsHeaders: Record<string, string>): Promise<Response> {
   // Check Supabase
   let supabaseOk = false;
   try {
@@ -151,7 +155,38 @@ async function handleHealth(): Promise<Response> {
     supabase: supabaseOk,
     ollama: ollamaOk,
     timestamp: new Date().toISOString(),
-  });
+  }, 200, corsHeaders);
+}
+
+async function handleGetAudio(storyId: string, chapterNum: number, corsHeaders: Record<string, string>): Promise<Response> {
+  const audioDir = process.env.AUDIO_DIR ||
+    require("path").join(process.cwd(), "audio");
+  const audioPath = require("path").join(audioDir, storyId, `chapter_${chapterNum}.mp3`);
+
+  try {
+    const file = await Bun.file(audioPath).arrayBuffer();
+    return new Response(file, {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=3600",
+        ...corsHeaders,
+      },
+    });
+  } catch (err: any) {
+    console.warn(`[Audio] Not found: ${audioPath}`);
+    return new Response(
+      JSON.stringify({ error: "Audio not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
+  }
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────────
@@ -162,41 +197,51 @@ const server = Bun.serve({
     const url = new URL(req.url);
     const { pathname, method } = Object.assign(url, { method: req.method });
 
-    // CORS for local dev
+    // CORS headers for all responses
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Range",
+    };
+
+    // CORS preflight
     if (req.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
+        headers: corsHeaders,
       });
     }
 
     try {
       if (pathname === "/health" && method === "GET") {
-        return await handleHealth();
+        return await handleHealth(corsHeaders);
       }
 
       if (pathname === "/stories" && method === "POST") {
-        return await handlePostStory(req);
+        return await handlePostStory(req, corsHeaders);
       }
 
       const statusMatch = pathname.match(/^\/stories\/([^/]+)\/status$/);
       if (statusMatch && method === "GET") {
-        return await handleGetStoryStatus(statusMatch[1]);
+        return await handleGetStoryStatus(statusMatch[1], corsHeaders);
       }
 
-      return notFound();
+      // GET /stories/:id/chapters/:n/audio
+      const audioMatch = pathname.match(/^\/stories\/([^/]+)\/chapters\/(\d+)\/audio$/);
+      if (audioMatch && method === "GET") {
+        return await handleGetAudio(audioMatch[1], parseInt(audioMatch[2]), corsHeaders);
+      }
+
+      return notFound(corsHeaders);
     } catch (err: any) {
       console.error("[Server] Unhandled error:", err.message);
-      return json({ error: "Internal server error" }, 500);
+      return json({ error: "Internal server error" }, 500, corsHeaders);
     }
   },
 });
 
 console.log(`\n🌴 SandSync API running on http://localhost:${PORT}`);
-console.log(`   POST /stories         — create a story`);
-console.log(`   GET  /stories/:id/status — check status`);
-console.log(`   GET  /health          — health check\n`);
+console.log(`   POST /stories                        — create a story`);
+console.log(`   GET  /stories/:id/status            — check status`);
+console.log(`   GET  /stories/:id/chapters/:n/audio — serve chapter audio`);
+console.log(`   GET  /health                        — health check\n`);

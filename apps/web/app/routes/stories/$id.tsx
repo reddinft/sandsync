@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery, usePowerSyncStatus } from "@powersync/react";
 import { Story, StoryChapter } from "../../lib/powersync";
+import { AudioPlayer } from "../../components/AudioPlayer";
 
 export const Route = createFileRoute("/stories/$id")({
   component: StoryReaderPage,
@@ -34,6 +35,14 @@ function StoryReaderPage() {
   const { data: storyArray } = useQuery<Story>("SELECT * FROM stories WHERE id = ?", [id]);
   const { data: chapters } = useQuery<StoryChapter>("SELECT * FROM story_chapters WHERE story_id = ? ORDER BY chapter_number", [id]);
   const { data: agentEvents } = useQuery<any>("SELECT * FROM agent_events WHERE story_id = ? ORDER BY created_at DESC", [id]);
+
+  // Helper to convert relative audio URLs to absolute API URLs
+  const getAudioUrl = (audioUrl: string | null) => {
+    if (!audioUrl) return null;
+    if (audioUrl.startsWith("http")) return audioUrl;
+    const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
+    return `${apiUrl}${audioUrl}`;
+  };
 
   const story = storyArray && storyArray.length > 0 ? storyArray[0] : null;
   const [agentStatuses, setAgentStatuses] = useState<
@@ -219,15 +228,7 @@ function StoryReaderPage() {
               {/* Audio narration */}
               <div className="mt-8 pt-6 border-t border-amber-800/20">
                 {chapter.audio_url ? (
-                  <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 border border-purple-800/30 rounded-xl px-5 py-4">
-                    <div className="flex items-center gap-2 mb-3 text-sm font-medium text-purple-300">
-                      <span>🎵</span>
-                      <span>Narration by Devi</span>
-                    </div>
-                    <audio controls className="w-full rounded-lg" src={chapter.audio_url}>
-                      <track kind="captions" />
-                    </audio>
-                  </div>
+                  <AudioPlayer src={getAudioUrl(chapter.audio_url)!} chapterTitle={chapter.title} />
                 ) : (
                   <div className="bg-gradient-to-r from-purple-900/20 to-indigo-900/20 border border-purple-800/30 rounded-xl px-5 py-4 text-sm text-purple-300/70 flex items-center gap-3">
                     <span className="text-lg animate-pulse">🎵</span>
