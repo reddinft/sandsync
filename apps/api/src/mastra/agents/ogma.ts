@@ -3,15 +3,16 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { createOllama } from "ollama-ai-provider";
 
 // Use local Ollama when OLLAMA_BASE_URL is explicitly set (local dev / local-first demo)
-// Fall back to Anthropic Claude Haiku in production (Fly.io has no Ollama)
+// Fall back to Anthropic Claude in production (Fly.io has no Ollama)
+// Using claude-3-haiku as fallback (smaller, faster, cheaper)
 const useLocalOgma = !!process.env.OLLAMA_BASE_URL;
 const ogmaModel = useLocalOgma
   ? createOllama({
       baseURL: process.env.OLLAMA_BASE_URL + "/api",
     })("qwen2.5:latest")
-  : anthropic("claude-3-5-haiku-20241022");
+  : anthropic("claude-3-haiku-20240307");
 
-export const OGMA_MODEL_NAME = useLocalOgma ? "qwen2.5:latest" : "claude-3-5-haiku-20241022";
+export const OGMA_MODEL_NAME = useLocalOgma ? "qwen2.5:latest" : "claude-3-haiku-20240307";
 
 /**
  * Ogma — The Language Guardian
