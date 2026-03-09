@@ -9,7 +9,10 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "types": ["vite/client"],
-    "paths": {}
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["vite-env.d.ts", "app"],
   "exclude": ["node_modules", "dist", ".output"]
