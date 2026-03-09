@@ -558,9 +558,6 @@ Return ONLY valid JSON with the same structure as before.`;
           chapter_number: chapterNum,
           content: currentContent, // Anansi's final draft (after revision)
           reviewed_content: finalOgmaReview?.reviewed_content || currentContent,
-          audio_url: audioUrl,
-          image_url: imageUrl,
-          revision_count: revisionHistory.length - 1,
           quality_score: finalOgmaScore,
           agent_trace: agentTrace,
         });
