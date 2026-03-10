@@ -17,16 +17,14 @@ import * as fs from "fs";
 import { writeFile, mkdir } from "fs/promises";
 import * as path from "path";
 import { papaBois, anansi, ogma } from "../index";
-import { OGMA_MODEL_NAME, OGMA_PROVIDER } from "../agents/ogma";
+import { OGMA_MODEL_NAME } from "../agents/ogma";
 import { generateNarration, estimateCost } from "../../services/elevenlabs";
 import {
-  generateChapterImage,
   generateIllustrationPrompt,
+  generateImageFromPrompt,
+  saveImageBase64,
   estimateImageCost,
-} from "../../services/image-gen";
-import { generateKokoroAudio, uploadKokoroAudio } from "../../services/kokoro";
-import { generateFluxImage, uploadFluxImage } from "../../services/flux";
-import { generateChapterVideoBackground } from "../../services/video-gen";
+} from "../../services/imagen";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -313,9 +311,9 @@ Return ONLY valid JSON:
 
 Score below 7.5 means the draft needs revision. Be honest and rigorous.`;
 
-          // Use generate() — works with both v3 (Anthropic) and v4 (Ollama) models
+          // Use generateLegacy() — Ogma uses ollama-ai-provider (AI SDK v4 compat) or Anthropic
         // Timeout for potentially slow local models (qwen2.5 on limited hardware)
-        const ogmaResult = await ogma.generate(ogmaPrompt);
+        const ogmaResult = await ogma.generateLegacy(ogmaPrompt);
         const ogmaLatency = Date.now() - ogmaT0;
         totalOgmaLatency += ogmaLatency;
 
@@ -382,10 +380,9 @@ Please revise based on these notes. The chapter must score ≥7.5 for cultural a
 Return ONLY valid JSON with the same structure as before.`;
       }
 
-      // ── 2c. Devi — Voice narration (with Kokoro fallback) ─────────────────────
+      // ── 2c. Devi — Voice narration ─────────────────────────────────────────
 
       let audioUrl: string | null = null;
-      let audioSource = "elevenlabs";
       let deviTrace: any = null;
       const textToNarrate = currentContent;
 
@@ -398,102 +395,39 @@ Return ONLY valid JSON with the same structure as before.`;
 
         try {
           const voiceId = "SOYHLrjzK2X1ezoPC6cr"; // Anansi's voice — the storyteller narrates
-          // ElevenLabs with 25s timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 25_000);
+          const narration = await generateNarration(textToNarrate, voiceId);
+          const deviLatency = Date.now() - deviT0;
+          const cost = estimateCost(textToNarrate, narration.modelId);
+          totalCostUsd += cost;
 
-          try {
-            const narration = await generateNarration(textToNarrate, voiceId);
-            clearTimeout(timeoutId);
-            const deviLatency = Date.now() - deviT0;
-            const cost = estimateCost(textToNarrate, narration.modelId);
-            totalCostUsd += cost;
+          // Save audio file
+          const audioDir = path.resolve(
+            process.env.AUDIO_DIR ||
+            path.join(process.cwd(), "audio"),
+            storyId
+          );
+          await mkdir(audioDir, { recursive: true });
+          const audioPath = path.join(audioDir, `chapter_${chapterNum}.mp3`);
+          await writeFile(audioPath, narration.audioBuffer);
+          audioUrl = `/audio/${storyId}/chapter_${chapterNum}.mp3`;
 
-            // Save audio file
-            const audioDir = path.resolve(
-              process.env.AUDIO_DIR ||
-              path.join(process.cwd(), "audio"),
-              storyId
-            );
-            await mkdir(audioDir, { recursive: true });
-            const audioPath = path.join(audioDir, `chapter_${chapterNum}.mp3`);
-            await writeFile(audioPath, narration.audioBuffer);
-            audioUrl = `/audio/${storyId}/chapter_${chapterNum}.mp3`;
+          deviTrace = {
+            latency_ms: deviLatency,
+            voice_id: voiceId,
+            audio_duration_s: narration.durationSeconds,
+            cost_usd: cost,
+          };
 
-            deviTrace = {
-              latency_ms: deviLatency,
-              voice_id: voiceId,
-              audio_duration_s: narration.durationSeconds,
-              cost_usd: cost,
-              source: "elevenlabs",
-            };
+          await writeAgentEvent(supabase, storyId, "devi", "completed", {
+            chapter: chapterNum,
+            audio_url: audioUrl,
+            latency_ms: deviLatency,
+            voice_id: voiceId,
+          });
 
-            await writeAgentEvent(supabase, storyId, "devi", "completed", {
-              chapter: chapterNum,
-              audio_url: audioUrl,
-              latency_ms: deviLatency,
-              voice_id: voiceId,
-              source: "elevenlabs",
-            });
-
-            console.log(`  [Devi] ✅ Audio saved to ${audioUrl} (${narration.durationSeconds}s, $${cost})`);
-          } catch (err: any) {
-            clearTimeout(timeoutId);
-            const isQuota = err?.status === 429 || err?.message?.includes("quota");
-            console.warn(
-              `  [Devi] ⚠️  ElevenLabs failed (${err?.message}) — falling back to Kokoro`
-            );
-
-            // Fallback to Kokoro TTS
-            const kokoroBuffer = await generateKokoroAudio(textToNarrate);
-            if (kokoroBuffer) {
-              audioUrl = await uploadKokoroAudio(kokoroBuffer, storyId, chapterNum);
-              audioSource = "kokoro";
-              const deviLatency = Date.now() - deviT0;
-
-              // Schedule retry: quota = 1 hour, other error = 10 min
-              const retryAfter = new Date(
-                Date.now() + (isQuota ? 3_600_000 : 600_000)
-              );
-
-              // Update chapter with fallback source and retry window
-              await supabase
-                .from("story_chapters")
-                .update({
-                  audio_source: "kokoro",
-                  audio_retry_after: retryAfter.toISOString(),
-                })
-                .eq("story_id", storyId)
-                .eq("chapter_number", chapterNum);
-
-              deviTrace = {
-                latency_ms: deviLatency,
-                source: "kokoro",
-                cost_usd: 0,
-                retry_after: retryAfter.toISOString(),
-              };
-
-              await writeAgentEvent(supabase, storyId, "devi", "fallback", {
-                chapter: chapterNum,
-                audio_url: audioUrl,
-                fallback_source: "kokoro",
-                retry_after: retryAfter.toISOString(),
-                original_error: err?.message,
-              });
-
-              console.log(
-                `  [Devi] ✅ Kokoro audio saved (will upgrade to ElevenLabs at ${retryAfter.toISOString()})`
-              );
-            } else {
-              console.warn(`  [Devi] ❌ Both ElevenLabs and Kokoro failed — skipping audio`);
-              await writeAgentEvent(supabase, storyId, "devi", "failed", {
-                chapter: chapterNum,
-                error: "Both ElevenLabs and Kokoro failed",
-              });
-            }
-          }
+          console.log(`  [Devi] ✅ Audio saved to ${audioUrl} (${narration.durationSeconds}s, $${cost})`);
         } catch (err: any) {
-          console.warn(`  [Devi] ❌ Unexpected error: ${err.message}`);
+          console.warn(`  [Devi] ⚠️  ElevenLabs failed: ${err.message} — skipping audio`);
           await writeAgentEvent(supabase, storyId, "devi", "failed", {
             chapter: chapterNum,
             error: err.message,
@@ -512,81 +446,69 @@ Return ONLY valid JSON with the same structure as before.`;
         console.log(`  [Devi] 🔇 Dry-run mode — skipping ElevenLabs, mocking audio_url`);
       }
 
-      // ── 2c-bis. Image generation (Gemini Imagen with Flux fallback) ────────────────────────
+      // ── 2c-bis. Image generation (Gemini Imagen) ────────────────────────
 
       let imageUrl: string | null = null;
-      let imageSource = "fal";
       let illustrationPrompt: string | null = null;
       let imagenTrace: any = null;
 
       if (!dryRun) {
-        console.log(`  [ImageGen] 🎨 Generating chapter illustration (cascade: fal → gemini → flux)...`);
+        console.log(`  [Imagen] 🎨 Generating chapter illustration...`);
+        const imagenT0 = Date.now();
 
         try {
           await writeAgentEvent(supabase, storyId, "imagen", "started", {
             chapter: chapterNum,
           });
 
-          const imgResult = await generateChapterImage(
+          // Generate illustration prompt using Haiku
+          illustrationPrompt = await generateIllustrationPrompt(
             currentContent,
             chapterNum,
             brief.title,
-            brief.folklore_elements,
-            storyId
+            brief.folklore_elements
           );
 
-          imageUrl = imgResult.imageUrl;
-          imageSource = imgResult.source;
-          totalCostUsd += imgResult.cost_usd;
+          // Call Gemini Imagen API
+          const base64Image = await generateImageFromPrompt(illustrationPrompt);
 
-          illustrationPrompt = `[generated by ${imgResult.source}]`;
+          // Save base64 to local storage (for offline-first support)
+          imageUrl = await saveImageBase64(base64Image, storyId, chapterNum);
+
+          const imagenLatency = Date.now() - imagenT0;
+          const imagenCost = estimateImageCost();
+          totalCostUsd += imagenCost;
 
           imagenTrace = {
-            latency_ms: imgResult.latency_ms,
-            source: imgResult.source,
-            cost_usd: imgResult.cost_usd,
-            error: imgResult.error,
+            latency_ms: imagenLatency,
+            model: "imagen-4.0-generate-002",
+            cost_usd: imagenCost,
+            image_size_bytes: base64Image.length,
           };
 
-          if (imgResult.imageUrl) {
-            await writeAgentEvent(supabase, storyId, "imagen", "completed", {
-              chapter: chapterNum,
-              image_url: imgResult.imageUrl,
-              latency_ms: imgResult.latency_ms,
-              cost_usd: imgResult.cost_usd,
-              source: imgResult.source,
-            });
+          await writeAgentEvent(supabase, storyId, "imagen", "completed", {
+            chapter: chapterNum,
+            image_url: imageUrl,
+            latency_ms: imagenLatency,
+            cost_usd: imagenCost,
+          });
 
-            // If flux was used as fallback, schedule upgrade retry
-            if (imgResult.source === "flux") {
-              const retryAfter = new Date(Date.now() + 600_000);
-              await supabase
-                .from("story_chapters")
-                .update({
-                  image_source: "flux",
-                  image_retry_after: retryAfter.toISOString(),
-                })
-                .eq("story_id", storyId)
-                .eq("chapter_number", chapterNum);
-            }
-
-            console.log(
-              `  [ImageGen] ✅ Illustration via ${imgResult.source} (${imgResult.latency_ms}ms, $${imgResult.cost_usd})`
-            );
-          } else {
-            await writeAgentEvent(supabase, storyId, "imagen", "failed", {
-              chapter: chapterNum,
-              error: imgResult.error || "All providers failed",
-            });
-            console.warn(`  [ImageGen] ❌ All image providers failed`);
-          }
+          console.log(
+            `  [Imagen] ✅ Illustration generated (${imagenLatency}ms, $${imagenCost})`
+          );
         } catch (err: any) {
-          console.warn(`  [ImageGen] ❌ Unexpected error: ${err.message}`);
+          console.warn(
+            `  [Imagen] ⚠️  Image generation failed: ${err.message} — skipping`
+          );
           await writeAgentEvent(supabase, storyId, "imagen", "failed", {
             chapter: chapterNum,
             error: err.message,
           });
-          imagenTrace = { latency_ms: 0, error: err.message, cost_usd: 0 };
+          imagenTrace = {
+            latency_ms: 0,
+            error: err.message,
+            cost_usd: 0,
+          };
         }
       } else {
         // Dry-run: mock image
@@ -595,11 +517,11 @@ Return ONLY valid JSON with the same structure as before.`;
         imageUrl = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==`;
         imagenTrace = {
           latency_ms: 0,
-          source: "fal",
+          model: "imagen-4.0-generate-002",
           cost_usd: 0,
           dry_run: true,
         };
-        console.log(`  [ImageGen] 🔇 Dry-run mode — mocking image`);
+        console.log(`  [Imagen] 🔇 Dry-run mode — mocking image`);
       }
 
       // ── 2d. Write chapter to Supabase ──────────────────────────────────────
@@ -617,8 +539,7 @@ Return ONLY valid JSON with the same structure as before.`;
         },
         ogma: {
           model: OGMA_MODEL_NAME,
-          provider: OGMA_PROVIDER,
-          cost_usd: OGMA_PROVIDER === "ollama" ? 0.0 : OGMA_PROVIDER === "groq" ? 0.0 : 0.00008,
+          cost_usd: process.env.OLLAMA_BASE_URL ? 0.0 : 0.00008, // $0 local Ollama, ~0.00008 for Anthropic Haiku
           quality_score: finalOgmaScore,
           cultural_notes: finalOgmaReview?.cultural_notes || "",
           changes_made: finalOgmaReview?.changes_made || [],
@@ -635,6 +556,10 @@ Return ONLY valid JSON with the same structure as before.`;
           chapter_number: chapterNum,
           content: currentContent, // Anansi's final draft (after revision)
           reviewed_content: finalOgmaReview?.reviewed_content || currentContent,
+          audio_url: audioUrl,
+          image_url: imageUrl,
+          illustration_prompt: illustrationPrompt,
+          revision_count: revisionHistory.length - 1,
           quality_score: finalOgmaScore,
           agent_trace: agentTrace,
         });
@@ -643,16 +568,6 @@ Return ONLY valid JSON with the same structure as before.`;
         console.error(`[Chapter ${chapterNum}] ❌ DB write failed:`, chapterError.message);
       } else {
         console.log(`[Chapter ${chapterNum}] ✅ Written to Supabase (score: ${finalOgmaScore.toFixed(1)}, revisions: ${revisionHistory.length - 1})`);
-
-        // ── Background video generation (non-blocking) ──────────────────────
-        if (!dryRun) {
-          const videoPrompt = illustrationPrompt || currentContent.slice(0, 300);
-          // Fire-and-forget — don't await, don't block story completion
-          generateChapterVideoBackground(videoPrompt, storyId, chapterNum).catch(
-            (err) => console.warn(`[VideoGen] Background task error (ch${chapterNum}):`, err)
-          );
-          console.log(`  [VideoGen] 🎬 Video generation queued for chapter ${chapterNum}`);
-        }
       }
 
       await writeAgentEvent(supabase, storyId, "anansi", "completed", {

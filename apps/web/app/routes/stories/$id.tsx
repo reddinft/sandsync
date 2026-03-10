@@ -8,12 +8,13 @@ export const Route = createFileRoute("/stories/$id")({
   component: StoryReaderPage,
 });
 
-const AGENT_COLORS: Record<string, string> = {
-  papa_bois: "bg-slate-800/50",
-  anansi: "bg-slate-800/50",
-  ogma: "bg-slate-800/50",
-  devi: "bg-slate-800/50",
-  imagen: "bg-slate-800/50",
+/* Belle's agent accent colors */
+const AGENT_COLORS: Record<string, { bg: string; border: string; textBg: string }> = {
+  papa_bois: { bg: "from-emerald-900/20 to-emerald-900/10", border: "border-emerald-600/50", textBg: "bg-emerald-400/20 text-emerald-100 border-emerald-400/50" },
+  anansi: { bg: "from-orange-900/20 to-orange-900/10", border: "border-orange-500/50", textBg: "bg-orange-500/20 text-orange-100 border-orange-500/50" },
+  ogma: { bg: "from-purple-900/20 to-purple-900/10", border: "border-purple-600/50", textBg: "bg-purple-600/20 text-purple-100 border-purple-600/50" },
+  devi: { bg: "from-amber-900/20 to-amber-900/10", border: "border-amber-400/50", textBg: "bg-amber-400/20 text-amber-100 border-amber-400/50" },
+  imagen: { bg: "from-indigo-900/20 to-indigo-900/10", border: "border-indigo-600/50", textBg: "bg-indigo-400/20 text-indigo-100 border-indigo-600/50" },
 };
 
 const AGENT_ICONS: Record<string, string> = {
@@ -145,60 +146,74 @@ function StoryReaderPage() {
           <div className="text-amber-500/70 text-lg font-medium">{story.genre}</div>
         </div>
 
-        {/* Sync status indicator */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/30 w-fit">
-          <span
-            className={`w-2 h-2 rounded-full transition-colors ${
-              syncStatus.connected ? "bg-green-400" : "bg-yellow-400/60"
-            }`}
-          ></span>
-          <span className="text-xs font-medium" style={{ color: syncStatus.connected ? "#a3e635" : "#facc15" }}>
-            {syncStatus.connected
-              ? "Synced • Online"
-              : "Offline • Local cache"}
-          </span>
+        {/* Sync status badge — Belle's spec */}
+        <div className="flex items-center gap-2 fixed top-6 right-6 z-40">
+          {syncStatus.connected ? (
+            <div className="bg-emerald-400/20 text-emerald-100 border-emerald-400/50 rounded-full inline-flex items-center gap-2 px-3 py-1 text-xs font-medium border">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span>Live</span>
+            </div>
+          ) : (
+            <div className="bg-rose-400/20 text-rose-100 border-rose-400/50 rounded-full inline-flex items-center gap-2 px-3 py-1 text-xs font-medium border">
+              <span className="w-2 h-2 bg-rose-400 rounded-full" />
+              <span>Offline</span>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Agent pipeline status */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {Object.entries(agentStatuses).map(([agent, status]) => (
-          <div
-            key={agent}
-            className={`border rounded-lg px-4 py-3 backdrop-blur transition-all duration-300 ${
-              status.completed
-                ? "bg-green-500/20 border-green-400/60 shadow-green-400/30 shadow-lg"
-                : "bg-amber-500/30 border-amber-400 shadow-amber-400/30 shadow-lg scale-105"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{AGENT_ICONS[agent]}</span>
-                <span className="font-semibold text-amber-100 text-sm">
-                  {AGENT_LABELS[agent]}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {status.completed ? (
-                  <span className="text-xs font-medium text-green-400 flex items-center gap-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                    Done
-                  </span>
-                ) : (
-                  <span className="text-xs font-medium text-amber-400 flex items-center gap-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                    Working
-                  </span>
+      {/* Agent pipeline status bar — Belle's spec */}
+      <div className="space-y-4">
+        <p className="text-sm text-amber-200/60 uppercase tracking-wider font-semibold">
+          Story Weaving Pipeline
+        </p>
+        <div className="flex items-center justify-between gap-2 md:gap-4">
+          {Object.entries(agentStatuses).map(([agent, status], idx) => {
+            const colors = AGENT_COLORS[agent];
+            return (
+              <div key={agent} className="flex items-center gap-2 md:gap-4 flex-1">
+                <div
+                  className={`flex-1 text-center px-3 py-3 rounded-lg transition-all duration-300 border-2 ${
+                    status.completed
+                      ? `bg-gradient-to-br ${colors.bg} border-${agent === 'papa_bois' ? 'emerald' : agent === 'anansi' ? 'orange' : agent === 'ogma' ? 'purple' : 'amber'}-600/30`
+                      : `bg-indigo-700/20 border-indigo-700/30`
+                  }`}
+                >
+                  <div className="text-xs font-semibold mb-1 text-amber-100">
+                    {AGENT_ICONS[agent]} {AGENT_LABELS[agent]}
+                  </div>
+                  <div className="text-xs text-amber-200/60">
+                    {agent === 'papa_bois' ? 'Concept' : agent === 'anansi' ? 'Narrative' : agent === 'ogma' ? 'Imagery' : 'Polish'}
+                  </div>
+                  {status.completed && (
+                    <div className="mt-2 text-xs text-emerald-300">
+                      ✓ Complete
+                    </div>
+                  )}
+                </div>
+                {idx < Object.entries(agentStatuses).length - 1 && (
+                  <div className="flex-shrink-0 text-amber-400/50">→</div>
                 )}
               </div>
+            );
+          })}
+        </div>
+        
+        {/* Progress bar */}
+        {isGenerating && (
+          <div className="pt-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-amber-200/60">Overall Progress</span>
+              <span className="text-xs text-amber-200/60 font-mono">{Math.round((completedAgents / totalAgents) * 100)}%</span>
             </div>
-            {status.latency && (
-              <div className="text-xs text-amber-200/60 mt-2">
-                {(status.latency / 1000).toFixed(1)}s
-              </div>
-            )}
+            <div className="w-full h-2 bg-indigo-700/30 rounded-full overflow-hidden border border-amber-200/20">
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-200 shadow-lg shadow-amber-400/30 transition-all duration-500 ease-out"
+                style={{ width: `${(completedAgents / totalAgents) * 100}%` }}
+              ></div>
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Progress bar */}

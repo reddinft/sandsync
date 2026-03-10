@@ -1,9 +1,31 @@
 import { Agent } from "@mastra/core/agent";
+import { anthropic } from "@ai-sdk/anthropic";
 import { createOllama } from "ollama-ai-provider";
+import { createGroq } from "@ai-sdk/groq";
 
-const ollama = createOllama({
-  baseURL: process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/api",
-});
+// Provider cascade:
+//   1. Ollama qwen2.5 — local dev / offline-capable (OLLAMA_BASE_URL present)
+//   2. Groq Llama 3.1 8B — fast cloud inference, free tier (GROQ_API_KEY present)
+//   3. Anthropic Claude Haiku — production fallback (always available)
+
+function resolveOgmaModel() {
+  if (process.env.OLLAMA_BASE_URL) {
+    const ollama = createOllama({ baseURL: process.env.OLLAMA_BASE_URL + "/api" });
+    return { model: ollama("qwen2.5:latest"), name: "qwen2.5:latest", provider: "ollama" };
+  }
+  if (process.env.GROQ_API_KEY) {
+    const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
+    return { model: groq("llama-3.1-8b-instant"), name: "llama-3.1-8b-instant", provider: "groq" };
+  }
+  return { model: anthropic("claude-3-haiku-20240307"), name: "claude-3-haiku-20240307", provider: "anthropic" };
+}
+
+const resolved = resolveOgmaModel();
+const ogmaModel = resolved.model;
+export const OGMA_MODEL_NAME = resolved.name;
+export const OGMA_PROVIDER = resolved.provider;
+
+console.log(`[Ogma] Using provider: ${OGMA_PROVIDER} (model: ${OGMA_MODEL_NAME})`);
 
 /**
  * Ogma — The Language Guardian
@@ -13,13 +35,12 @@ const ollama = createOllama({
  * and beauty of language. In SandSync, Ogma reviews Anansi's drafts for
  * language quality, cultural authenticity, and narrative polish.
  *
- * Runs on the model specified by OLLAMA_MODEL env var (default: qwen2.5:latest)
- * via local Ollama — the "local-first" prize track entry.
- * Zero API cost, private inference, works offline.
+ * Provider cascade: Ollama (local) → Groq Llama 3.1 8B (cloud free tier) → Anthropic Claude Haiku
  *
  * Voice: Irish accent, precise and scholarly
  */
 export const ogma = new Agent({
+  id: "ogma",
   name: "Ogma",
   instructions: `You are Ogma, the guardian of language and keeper of eloquence.
 
@@ -51,5 +72,5 @@ Output format:
 
 You are precise but not pedantic. You improve without erasing. Anansi's voice must survive your review. Reject generic writing — demand authenticity.`,
 
-  model: ollama(process.env.OLLAMA_MODEL || "qwen2.5:latest"),
+  model: ogmaModel,
 });

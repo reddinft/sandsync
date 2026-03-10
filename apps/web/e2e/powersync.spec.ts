@@ -13,7 +13,7 @@ test.describe("Feature: PowerSync Real-time Sync", () => {
     // Use domcontentloaded instead of networkidle — PowerSync keeps persistent connections alive
     await page.waitForLoadState("domcontentloaded");
     // Wait for the app title to appear (confirms React mounted)
-    await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Summon a Story")).toBeVisible({ timeout: 10000 });
 
     // Filter out expected dev warnings
     const criticalErrors = consoleErrors.filter(
@@ -31,11 +31,11 @@ test.describe("Feature: PowerSync Real-time Sync", () => {
   test("local SQLite database is accessible", async ({ page }) => {
     await page.goto("/");
     // Wait for app to render (confirms PowerSync schema init didn't crash)
-    await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Summon a Story")).toBeVisible({ timeout: 10000 });
 
     // Evaluate: page is rendered = local SQLite schema loaded without crash
     const isReady = await page.evaluate(() => {
-      return document.body.innerText.includes("Stories from the Spirit World");
+      return document.body.innerText.includes("Summon a Story");
     });
 
     expect(isReady).toBe(true);

@@ -16,23 +16,22 @@ test.describe("Feature: Home Page", () => {
 
     await then("the page title is visible", async () => {
       await expect(
-        page.getByText("Stories from the Spirit World")
+        page.getByText("Summon a Story")
       ).toBeVisible({ timeout: 10000 });
     });
 
     await then("the story request form is visible", async () => {
-      await expect(page.getByText("Request a Story")).toBeVisible();
-      await expect(page.getByText("Begin the Story")).toBeVisible();
+      await expect(page.getByText("What type of tale calls to you?")).toBeVisible();
+      await expect(page.getByText("Summon the Story")).toBeVisible();
     });
 
     await then("the genre selector has Caribbean folklore options", async () => {
-      const select = page.locator("select");
-      await expect(select).toBeVisible();
-      // Verify Anansi option exists in the select (options aren't "visible" per Playwright — check value)
-      const options = await select.locator("option").count();
-      expect(options).toBeGreaterThan(0);
-      const firstOption = await select.locator("option").first().textContent();
-      expect(firstOption).toContain("Anansi");
+      // Genre pills are now buttons, not a select dropdown
+      const genreButtons = page.getByRole("button", { name: /🕷️|🌳|🔥|👠|🐺|🐍|👣|🌲/ });
+      await expect(genreButtons.first()).toBeVisible();
+      // Verify Anansi option exists
+      const anansiButton = page.getByRole("button", { name: /🕷️.*Anansi/ });
+      await expect(anansiButton).toBeVisible();
     });
   });
 
@@ -42,7 +41,7 @@ test.describe("Feature: Home Page", () => {
     });
 
     await then("the recent stories section is visible", async () => {
-      await expect(page.getByText("Recent Stories")).toBeVisible();
+      await expect(page.getByText("Recent Tales")).toBeVisible();
     });
   });
 });
@@ -54,13 +53,15 @@ test.describe("Feature: Story Request Form", () => {
     });
 
     await when("they select a genre", async () => {
-      await page.locator("select").selectOption("Papa Bois forest spirit");
+      // Genre pills are now buttons with emoji and label
+      const papaBoisButton = page.getByRole("button", { name: /🌳.*Papa Bois forest spirit/ });
+      await papaBoisButton.click();
     });
 
     await then("the genre selection is reflected in the form", async () => {
-      await expect(page.locator("select")).toHaveValue(
-        "Papa Bois forest spirit"
-      );
+      // After clicking, the button should have a different style (bg-amber-100)
+      const papaBoisButton = page.getByRole("button", { name: /🌳.*Papa Bois forest spirit/ });
+      await expect(papaBoisButton).toHaveClass(/bg-amber-100/);
     });
 
     await then("the story length selector is not visible", async () => {
@@ -75,10 +76,10 @@ test.describe("Feature: Story Request Form", () => {
     });
 
     await when("they submit a story without the API running", async () => {
-      // Fill in the form
-      await page.locator("input[type='text']").fill("a brave fisherman");
+      // Fill in the theme textarea
+      await page.locator("textarea").fill("a brave fisherman");
       // Click submit
-      await page.getByText("Begin the Story").click();
+      await page.getByText("Summon the Story").click();
     });
 
     await then("an error message is displayed", async () => {
@@ -86,7 +87,7 @@ test.describe("Feature: Story Request Form", () => {
       await page.waitForTimeout(2000);
       // Just verify the page doesn't crash
       await expect(
-        page.getByText("Stories from the Spirit World")
+        page.getByText("Summon a Story")
       ).toBeVisible();
     });
   });
@@ -121,7 +122,7 @@ test.describe("Feature: Offline Badge", () => {
     await given("the user is on the home page", async () => {
       await page.goto("/");
       // Use domcontentloaded — PowerSync keeps persistent connections, never reaches networkidle
-      await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText("Summon a Story")).toBeVisible({ timeout: 10000 });
     });
 
     await when("the network is disconnected", async () => {
@@ -282,7 +283,7 @@ test.describe("Feature: Offline Mode", () => {
   }) => {
     await given("the user is on the story request form", async () => {
       await page.goto("/");
-      await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText("Summon a Story")).toBeVisible({ timeout: 10000 });
     });
 
     await when("the network is disconnected", async () => {
@@ -290,15 +291,15 @@ test.describe("Feature: Offline Mode", () => {
     });
 
     await when("they try to submit a story request", async () => {
-      // Fill in the form
-      const input = page.locator("input[type='text']");
-      const count = await input.count();
+      // Fill in the form (theme textarea)
+      const textarea = page.locator("textarea");
+      const count = await textarea.count();
       if (count > 0) {
-        await input.first().fill("a brave hero");
+        await textarea.first().fill("a brave hero");
       }
 
       // Click submit button
-      const submitBtn = page.getByText("Begin the Story");
+      const submitBtn = page.getByText("Summon the Story");
       const btnCount = await submitBtn.count();
       if (btnCount > 0) {
         await submitBtn.click();
@@ -328,7 +329,7 @@ test.describe("Feature: Offline Mode", () => {
   }) => {
     await given("the user is on the home page", async () => {
       await page.goto("/");
-      await expect(page.getByText("Stories from the Spirit World")).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText("Summon a Story")).toBeVisible({ timeout: 10000 });
     });
 
     await when("the network is disconnected", async () => {

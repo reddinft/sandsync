@@ -13,6 +13,7 @@ import { anthropic } from "@ai-sdk/anthropic";
  * ElevenLabs Voice ID: N2lVS1w4EtoT3dr4eOWO (eleven_multilingual_v2)
  */
 export const devi = new Agent({
+  id: "devi",
   name: "Devi",
   instructions: `You are Devi, the goddess of voice and the bridge between text and sound.
 

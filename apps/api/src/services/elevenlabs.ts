@@ -12,6 +12,7 @@
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 const DEFAULT_VOICE_ID = "SOYHLrjzK2X1ezoPC6cr"; // Anansi — the storyteller narrates
+const ELEVENLABS_TIMEOUT_MS = 25000; // 25 second timeout for TTS generation
 
 export interface NarrationResult {
   audioBuffer: Buffer;
@@ -33,6 +34,7 @@ function estimateDuration(text: string): number {
 /**
  * Generate narrated audio for a chapter using ElevenLabs TTS.
  * Returns the audio buffer and estimated duration.
+ * Times out after 25 seconds to prevent hanging requests.
  */
 export async function generateNarration(
   text: string,
@@ -45,38 +47,45 @@ export async function generateNarration(
   }
 
   const url = `${ELEVENLABS_API_BASE}/text-to-speech/${voiceId}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ELEVENLABS_TIMEOUT_MS);
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Accept": "audio/mpeg",
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.0,
-        use_speaker_boost: true,
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
       },
-    }),
-  });
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.0,
+          use_speaker_boost: true,
+        },
+      }),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `ElevenLabs API error ${response.status}: ${errorText}`
-    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `ElevenLabs API error ${response.status}: ${errorText}`
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = Buffer.from(arrayBuffer);
+    const durationSeconds = estimateDuration(text);
+
+    return { audioBuffer, durationSeconds, voiceId, modelId };
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = Buffer.from(arrayBuffer);
-  const durationSeconds = estimateDuration(text);
-
-  return { audioBuffer, durationSeconds, voiceId, modelId };
 }
 
 /**

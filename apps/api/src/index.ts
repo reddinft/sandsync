@@ -7,6 +7,7 @@
  *
  * Endpoints:
  *   POST /stories                          — create story, kick off pipeline async
+ *   POST /stories/voice                    — create story from audio (Deepgram STT)
  *   GET  /stories/:id/status               — poll story status
  *   GET  /stories/:id/chapters/:n/audio    — serve chapter audio file (CORS enabled)
  *   GET  /health                           — health check (Mastra, Supabase, Ollama)
@@ -14,6 +15,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { storyPipeline } from "./mastra/workflows/story-pipeline";
+import { retryFallbackJobs } from "./services/retry-worker";
+import { transcribeAudio } from "./services/deepgram";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -74,7 +77,6 @@ async function handlePostStory(req: Request, corsHeaders: Record<string, string>
   }
 
   const storyId = story.id;
-  console.log(`[POST /stories] Created story ${storyId} for user ${userId}`);
 
   // Kick off pipeline async — do NOT await
   (async () => {
@@ -175,7 +177,6 @@ async function handleGetAudio(storyId: string, chapterNum: number, corsHeaders: 
       },
     });
   } catch (err: any) {
-    console.warn(`[Audio] Not found: ${audioPath}`);
     return new Response(
       JSON.stringify({ error: "Audio not found" }),
       {
@@ -187,6 +188,82 @@ async function handleGetAudio(storyId: string, chapterNum: number, corsHeaders: 
       }
     );
   }
+}
+
+async function handlePostStoryVoice(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
+  // Check Deepgram is configured before parsing body
+  if (!process.env.DEEPGRAM_API_KEY) {
+    return json({ error: "voice_unavailable" }, 503, corsHeaders);
+  }
+
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return badRequest("Expected multipart/form-data", corsHeaders);
+  }
+
+  const userId = formData.get("userId")?.toString();
+  if (!userId) return badRequest("userId is required", corsHeaders);
+
+  const audioFile = formData.get("audio");
+  if (!audioFile || !(audioFile instanceof Blob)) {
+    return badRequest("audio field (audio blob) is required", corsHeaders);
+  }
+
+  const mimeType = audioFile.type || "audio/webm";
+  const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+
+  // Transcribe audio
+  const transcriptResult = await transcribeAudio(audioBuffer, mimeType);
+  if (!transcriptResult) {
+    return json({ error: "transcription_failed" }, 502, corsHeaders);
+  }
+
+  // Create story row
+  const { data: story, error } = await supabase
+    .from("stories")
+    .insert({ user_id: userId, status: "queued" })
+    .select()
+    .single();
+
+  if (error || !story) {
+    console.error("[POST /stories/voice] DB error:", error?.message);
+    return json({ error: "Failed to create story" }, 500, corsHeaders);
+  }
+
+  const storyId = story.id;
+
+  // Record the voice request in voice_requests table
+  await supabase.from("voice_requests").insert({
+    story_id: storyId,
+    transcript: transcriptResult.transcript,
+    audio_duration_ms: transcriptResult.audio_duration_ms,
+    deepgram_request_id: transcriptResult.request_id,
+    confidence: transcriptResult.confidence,
+  });
+
+  // Kick off pipeline using transcript as the user request
+  (async () => {
+    try {
+      const run = await storyPipeline.createRun();
+      await run.start({
+        inputData: {
+          storyId,
+          userRequest: transcriptResult.transcript,
+          dryRun: false,
+        },
+      });
+    } catch (err: any) {
+      console.error(`[Pipeline/Voice] ❌ Story ${storyId} failed:`, err.message);
+      await supabase
+        .from("stories")
+        .update({ status: "failed" })
+        .eq("id", storyId);
+    }
+  })();
+
+  return json({ storyId, transcript: transcriptResult.transcript }, 201, corsHeaders);
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────────
@@ -215,6 +292,10 @@ const server = Bun.serve({
     try {
       if (pathname === "/health" && method === "GET") {
         return await handleHealth(corsHeaders);
+      }
+
+      if (pathname === "/stories/voice" && method === "POST") {
+        return await handlePostStoryVoice(req, corsHeaders);
       }
 
       if (pathname === "/stories" && method === "POST") {
@@ -260,8 +341,18 @@ const server = Bun.serve({
   },
 });
 
-console.log(`\n🌴 SandSync API running on http://localhost:${PORT}`);
-console.log(`   POST /stories                        — create a story`);
-console.log(`   GET  /stories/:id/status            — check status`);
-console.log(`   GET  /stories/:id/chapters/:n/audio — serve chapter audio`);
-console.log(`   GET  /health                        — health check\n`);
+console.log(`\n[SandSync API] 🚀 Server running on http://localhost:${PORT}`);
+console.log(`[SandSync API] 📡 Supabase: ${SUPABASE_URL}`);
+console.log(`[SandSync API] 🤖 Ollama: ${OLLAMA_URL}\n`);
+
+// ── Start background retry worker ────────────────────────────────────────────
+
+// Run once on startup
+retryFallbackJobs().catch(err => {
+  console.warn("[RetryWorker] Initial run failed:", err.message);
+});
+
+// Then run every 5 minutes (300,000ms)
+setInterval(retryFallbackJobs, 5 * 60 * 1000);
+
+

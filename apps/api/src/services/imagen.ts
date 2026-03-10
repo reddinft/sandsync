@@ -4,12 +4,15 @@
  */
 
 import * as fs from "fs";
-import { writeFile } from "fs/promises";
 import * as path from "path";
+import { writeFile, mkdir } from "fs/promises";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const IMAGEN_MODEL = "imagen-4.0-generate-002";
 const IMAGEN_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:predict`;
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://houtondlrbwaosdwqyiu.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const IMAGEN_TIMEOUT_MS = 30000; // 30 second timeout for Gemini image generation
 
 // Simple illustration prompt — use a fixed template instead of LLM generation
 // to keep image generation fast and deterministic
@@ -39,21 +42,23 @@ export async function generateIllustrationPrompt(
 
 /**
  * Generate an image using Gemini Imagen
- * Returns base64-encoded PNG
+ * Returns base64-encoded PNG or null if timeout
  */
-export async function generateImageFromPrompt(prompt: string): Promise<string> {
+export async function generateImageFromPrompt(
+  prompt: string
+): Promise<string | null> {
   if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not set");
+    console.warn("[Imagen] GEMINI_API_KEY not set — skipping image generation");
+    return null;
   }
 
   console.log(`[Imagen] Generating image from prompt (${prompt.length} chars)...`);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), IMAGEN_TIMEOUT_MS);
 
-  let response: Response;
   try {
-    response = await fetch(IMAGEN_ENDPOINT, {
+    const response = await fetch(IMAGEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,61 +77,105 @@ export async function generateImageFromPrompt(prompt: string): Promise<string> {
       }),
       signal: controller.signal,
     });
-  } catch (err: any) {
-    clearTimeout(timeout);
-    if (err.name === "AbortError") {
-      throw new Error("Image generation timed out");
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(
+        `[Imagen] API error (${response.status}): ${response.statusText}`
+      );
+      return null;
     }
-    throw err;
+
+    const data = (await response.json()) as {
+      predictions?: Array<{ bytesBase64Encoded?: string }>;
+    };
+
+    const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
+    if (!base64Image) {
+      console.warn("[Imagen] No image data in response");
+      return null;
+    }
+
+    console.log(`[Imagen] ✅ Image generated (${base64Image.length} bytes)`);
+    return base64Image;
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      console.warn(
+        `[Imagen] Timeout after ${IMAGEN_TIMEOUT_MS}ms — no image for this chapter`
+      );
+    } else {
+      console.warn(
+        `[Imagen] Error: ${(err as Error).message} — no image for this chapter`
+      );
+    }
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  clearTimeout(timeout);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[Imagen] API error: ${response.statusText}`, errorText);
-    throw new Error(
-      `Gemini Imagen API failed (${response.status}): ${response.statusText}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    predictions?: Array<{ bytesBase64Encoded?: string }>;
-  };
-
-  const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
-  if (!base64Image) {
-    throw new Error("No image data in Imagen response");
-  }
-
-  console.log(`[Imagen] ✅ Image generated (${base64Image.length} bytes)`);
-  return base64Image;
 }
 
 /**
- * Save a base64 image to Supabase Storage or local disk
- * For hackathon, we'll save locally and return a data: URL
+ * Upload a base64 image to Supabase Storage
+ * Returns public CDN URL or null if upload fails
  */
 export async function saveImageBase64(
   base64Image: string,
   storyId: string,
   chapterNumber: number
-): Promise<string> {
-  // For offline-first, save locally and return data URL
-  const imageDir = path.resolve(
-    process.env.IMAGE_DIR || path.join(process.cwd(), "images"),
-    storyId
-  );
-  fs.mkdirSync(imageDir, { recursive: true });
+): Promise<string | null> {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn(
+      "[Imagen] SUPABASE_SERVICE_ROLE_KEY not set — storing locally as fallback"
+    );
+    // Fallback: save locally if Supabase not configured
+    try {
+      const imageDir = path.resolve(
+        process.env.IMAGE_DIR || path.join(process.cwd(), "images"),
+        storyId
+      );
+      await mkdir(imageDir, { recursive: true });
+      const imagePath = path.join(imageDir, `chapter_${chapterNumber}.png`);
+      const imageBuffer = Buffer.from(base64Image, "base64");
+      await writeFile(imagePath, imageBuffer);
+      return `data:image/png;base64,${base64Image}`;
+    } catch (err) {
+      console.warn(`[Imagen] Local save failed: ${(err as Error).message}`);
+      return null;
+    }
+  }
 
-  const imagePath = path.join(imageDir, `chapter_${chapterNumber}.png`);
-  const imageBuffer = Buffer.from(base64Image, "base64");
-  await writeFile(imagePath, imageBuffer);
+  const buffer = Buffer.from(base64Image, "base64");
+  const filePath = `${storyId}/chapter_${chapterNumber}.png`;
 
-  // Return relative URL served by the static /images/* handler
-  const relativeUrl = `/images/${storyId}/chapter_${chapterNumber}.png`;
-  console.log(`[Imagen] Saved: ${imagePath}`);
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/story-images/${filePath}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "image/png",
+          "x-upsert": "true",
+        },
+        body: buffer,
+      }
+    );
 
-  return relativeUrl;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(
+        `[Imagen] Supabase upload failed (${response.status}): ${errorText}`
+      );
+      return null;
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/story-images/${filePath}`;
+    console.log(`[Imagen] ✅ Uploaded to Supabase: ${publicUrl}`);
+    return publicUrl;
+  } catch (err) {
+    console.warn(`[Imagen] Upload error: ${(err as Error).message}`);
+    return null;
+  }
 }
 
 /**

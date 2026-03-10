@@ -7,29 +7,34 @@ export const Route = createFileRoute("/stories/$id/agents")({
   component: AgentDebugPage,
 });
 
-const AGENT_STYLES: Record<string, { color: string; bgGradient: string; icon: string; label: string }> = {
+/* Belle's "Ember & Ether" agent color scheme */
+const AGENT_STYLES: Record<string, { color: string; bgGradient: string; icon: string; label: string; accentColor: string }> = {
   papa_bois: {
-    color: "text-green-400",
-    bgGradient: "from-green-900/20 to-emerald-900/10",
+    color: "text-emerald-400",
+    bgGradient: "from-emerald-900/20 to-emerald-900/10",
+    accentColor: "emerald",
     icon: "🌳",
     label: "Papa Bois",
   },
   anansi: {
-    color: "text-amber-400",
-    bgGradient: "from-amber-900/20 to-yellow-900/10",
+    color: "text-orange-400",
+    bgGradient: "from-orange-900/20 to-orange-900/10",
+    accentColor: "orange",
     icon: "🕷️",
     label: "Anansi",
   },
   ogma: {
-    color: "text-blue-400",
-    bgGradient: "from-blue-900/20 to-cyan-900/10",
+    color: "text-purple-400",
+    bgGradient: "from-purple-900/20 to-purple-900/10",
+    accentColor: "purple",
     icon: "📜",
     label: "Ogma",
   },
   devi: {
-    color: "text-purple-400",
-    bgGradient: "from-purple-900/20 to-indigo-900/10",
-    icon: "🎵",
+    color: "text-amber-400",
+    bgGradient: "from-amber-900/20 to-amber-900/10",
+    accentColor: "amber",
+    icon: "✨",
     label: "Devi",
   },
 };
