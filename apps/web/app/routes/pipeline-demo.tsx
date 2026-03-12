@@ -335,6 +335,47 @@ function usePipelineSimulation(
   }, [storyId]);
 }
 
+// ── Standalone simulation (no API required) ────────────────────────────────────
+
+/**
+ * Runs the full pipeline animation purely on timers — no API needed.
+ * Used in ?demo=1 mode for reliable screencasting.
+ */
+function useStandaloneSimulation(
+  active: boolean,
+  onStepsChange: (updater: (prev: PipelineSteps) => PipelineSteps) => void,
+  onComplete: (fakeId: string) => void
+) {
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const set = (id: StepId, state: StepState) => {
+      if (mountedRef.current) onStepsChange((prev) => ({ ...prev, [id]: state }));
+    };
+    const after = (ms: number, fn: () => void) => {
+      const t = setTimeout(() => { if (mountedRef.current) fn(); }, ms);
+      timers.push(t);
+    };
+
+    set("powersync_write", "active");
+    after(800,  () => { set("powersync_write", "complete"); set("mastra", "active"); });
+    after(3500, () => { set("mastra", "complete"); set("story_gen", "active"); set("fal_images", "active"); set("deepgram_tts", "active"); });
+    after(5000, () => { set("ogma_review", "active"); });
+    after(12000, () => { set("fal_images", "complete"); set("deepgram_tts", "complete"); });
+    after(17000, () => { set("story_gen", "complete"); set("ogma_review", "complete"); });
+    after(17300, () => { set("supabase", "active"); });
+    after(17900, () => { set("supabase", "complete"); set("powersync_sync", "active"); });
+    after(18400, () => { set("powersync_sync", "complete"); set("published", "active"); });
+    after(18800, () => { set("published", "complete"); onComplete("demo-sim-" + Date.now()); });
+
+    return () => timers.forEach(clearTimeout);
+  }, [active]);
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function PipelineDemoPage() {
@@ -347,7 +388,25 @@ function PipelineDemoPage() {
   const [storyTitle, setStoryTitle] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
 
-  usePipelineSimulation(storyId, setSteps);
+  // Demo mode: ?demo=1 bypasses API, runs visual simulation only
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const demoMode = searchParams?.get("demo") === "1";
+
+  // Simulation state for ?demo=1
+  const [demoSimActive, setDemoSimActive] = useState(false);
+  const [demoSimComplete, setDemoSimComplete] = useState(false);
+
+  usePipelineSimulation(demoMode ? null : storyId, setSteps);
+
+  useStandaloneSimulation(
+    demoSimActive,
+    setSteps,
+    (fakeId) => {
+      setStoryId(fakeId);
+      setDemoSimComplete(true);
+      setSubmitting(false);
+    }
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,6 +416,15 @@ function PipelineDemoPage() {
     setStoryTitle(null);
     setSteps({ ...INITIAL_STEPS, user_input: "active" });
 
+    // Demo mode: skip API, run visual simulation
+    if (demoMode) {
+      await new Promise((r) => setTimeout(r, 400));
+      setSteps((prev) => ({ ...prev, user_input: "complete" }));
+      setDemoSimActive(true);
+      setStatusMsg("Story submitted — watching pipeline...");
+      return;
+    }
+
     try {
       const apiUrl =
         (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
@@ -365,13 +433,18 @@ function PipelineDemoPage() {
       await new Promise((r) => setTimeout(r, 400));
       setSteps((prev) => ({ ...prev, user_input: "complete" }));
 
+      // Build a natural language request from genre + theme
+      const genreLabel = GENRES.find((g) => g.value === selectedGenre)?.label ?? selectedGenre;
+      const userRequest = theme
+        ? `Write a ${genreLabel} story about: ${theme}`
+        : `Write a ${genreLabel} Caribbean folklore story`;
+
       const response = await fetch(`${apiUrl}/stories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          genre: selectedGenre,
-          theme: theme || undefined,
-          length: "short",
+          userId: "demo-user",
+          request: userRequest,
         }),
       });
 
@@ -402,9 +475,11 @@ function PipelineDemoPage() {
     setSubmitting(false);
     setError("");
     setStatusMsg("");
+    setDemoSimActive(false);
+    setDemoSimComplete(false);
   };
 
-  const isRunning = storyId !== null && steps.published !== "complete";
+  const isRunning = (storyId !== null || demoSimActive) && steps.published !== "complete";
   const isComplete = steps.published === "complete";
 
   const currentProgress = progressLabel(steps, statusMsg);
