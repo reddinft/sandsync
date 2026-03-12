@@ -5,12 +5,42 @@ import {
   createRootRoute,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
-import { PowerSyncContext } from "@powersync/react";
+import { PowerSyncContext, usePowerSyncStatus } from "@powersync/react";
 import { powerSyncDatabase } from "../lib/powersync";
 
 export const Route = createRootRoute({
   component: RootComponent,
 });
+
+function SyncStatusPill() {
+  const syncStatus = usePowerSyncStatus();
+  return (
+    <span
+      className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border font-mono transition-all duration-500 ${
+        !syncStatus.connected
+          ? "bg-red-500/20 text-red-400 border-red-400/30"
+          : syncStatus.hasSynced
+          ? "bg-green-500/20 text-green-400 border-green-400/30"
+          : "bg-amber-500/20 text-amber-400 border-amber-400/30"
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          !syncStatus.connected
+            ? "bg-red-400"
+            : syncStatus.hasSynced
+            ? "bg-green-400"
+            : "bg-amber-400 animate-pulse"
+        }`}
+      />
+      {!syncStatus.connected
+        ? "Offline"
+        : syncStatus.hasSynced
+        ? "Synced"
+        : "Syncing"}
+    </span>
+  );
+}
 
 function RootComponent() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -59,9 +89,24 @@ function RootComponent() {
             <a href="/" className="text-xl font-bold tracking-tight text-amber-100">
               🌴 SandSync
             </a>
-            <span className="text-xs text-amber-200/60">
-              Caribbean Folklore AI · PowerSync AI Hackathon 2026
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-amber-200/60 hidden md:inline">
+                Caribbean Folklore AI · PowerSync AI Hackathon 2026
+              </span>
+              <SyncStatusPill />
+              <a
+                href="/demo"
+                className="text-[11px] text-amber-200/50 hover:text-amber-200/80 transition-colors px-2 py-1 rounded hover:bg-amber-500/10 font-mono"
+              >
+                🏗️ demo
+              </a>
+              <a
+                href="/pipeline-demo"
+                className="text-[11px] text-amber-200/50 hover:text-amber-200/80 transition-colors px-2 py-1 rounded hover:bg-amber-500/10 font-mono"
+              >
+                🔗 Pipeline
+              </a>
+            </div>
           </nav>
         </header>
         <main className="mx-auto max-w-4xl px-6 py-8 relative z-10">
