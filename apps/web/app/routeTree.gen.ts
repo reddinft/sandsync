@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PipelineDemoRouteImport } from './routes/pipeline-demo'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as AgentsDemoRouteImport } from './routes/agents-demo'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StoriesIdRouteImport } from './routes/stories/$id'
 import { Route as StoriesIdAgentsRouteImport } from './routes/stories/$id.agents'
@@ -23,6 +24,11 @@ const PipelineDemoRoute = PipelineDemoRouteImport.update({
 const DemoRoute = DemoRouteImport.update({
   id: '/demo',
   path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsDemoRoute = AgentsDemoRouteImport.update({
+  id: '/agents-demo',
+  path: '/agents-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +49,7 @@ const StoriesIdAgentsRoute = StoriesIdAgentsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents-demo': typeof AgentsDemoRoute
   '/demo': typeof DemoRoute
   '/pipeline-demo': typeof PipelineDemoRoute
   '/stories/$id': typeof StoriesIdRouteWithChildren
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents-demo': typeof AgentsDemoRoute
   '/demo': typeof DemoRoute
   '/pipeline-demo': typeof PipelineDemoRoute
   '/stories/$id': typeof StoriesIdRouteWithChildren
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents-demo': typeof AgentsDemoRoute
   '/demo': typeof DemoRoute
   '/pipeline-demo': typeof PipelineDemoRoute
   '/stories/$id': typeof StoriesIdRouteWithChildren
@@ -67,15 +76,23 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agents-demo'
     | '/demo'
     | '/pipeline-demo'
     | '/stories/$id'
     | '/stories/$id/agents'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo' | '/pipeline-demo' | '/stories/$id' | '/stories/$id/agents'
+  to:
+    | '/'
+    | '/agents-demo'
+    | '/demo'
+    | '/pipeline-demo'
+    | '/stories/$id'
+    | '/stories/$id/agents'
   id:
     | '__root__'
     | '/'
+    | '/agents-demo'
     | '/demo'
     | '/pipeline-demo'
     | '/stories/$id'
@@ -84,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsDemoRoute: typeof AgentsDemoRoute
   DemoRoute: typeof DemoRoute
   PipelineDemoRoute: typeof PipelineDemoRoute
   StoriesIdRoute: typeof StoriesIdRouteWithChildren
@@ -103,6 +121,13 @@ declare module '@tanstack/react-router' {
       path: '/demo'
       fullPath: '/demo'
       preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents-demo': {
+      id: '/agents-demo'
+      path: '/agents-demo'
+      fullPath: '/agents-demo'
+      preLoaderRoute: typeof AgentsDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -143,6 +168,7 @@ const StoriesIdRouteWithChildren = StoriesIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsDemoRoute: AgentsDemoRoute,
   DemoRoute: DemoRoute,
   PipelineDemoRoute: PipelineDemoRoute,
   StoriesIdRoute: StoriesIdRouteWithChildren,
