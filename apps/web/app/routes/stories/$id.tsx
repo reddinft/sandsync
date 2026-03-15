@@ -337,10 +337,15 @@ function StoryReaderPage() {
               <div className="mt-8 pt-6 border-t border-amber-200/20">
                 {chapter.audio_url ? (
                   <AudioPlayer src={getAudioUrl(chapter.audio_url)!} chapterTitle={chapter.title} />
-                ) : (
+                ) : isGenerating ? (
                   <div className="bg-slate-800/60 backdrop-blur rounded-xl border border-amber-200/20 px-5 py-4 text-sm text-amber-200/70 flex items-center gap-3">
                     <span className="text-lg animate-pulse">🎵</span>
                     <span className="font-medium">Narration by Devi — processing audio...</span>
+                  </div>
+                ) : (
+                  <div className="bg-slate-800/60 backdrop-blur rounded-xl border border-slate-600/30 px-5 py-4 text-sm text-amber-200/40 flex items-center gap-3">
+                    <span className="text-lg">🔇</span>
+                    <span className="font-medium">Audio unavailable — ElevenLabs quota exceeded</span>
                   </div>
                 )}
               </div>

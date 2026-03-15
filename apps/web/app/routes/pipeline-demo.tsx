@@ -113,12 +113,16 @@ function PipelineNode({
       ? "bg-amber-500/30 border-amber-400 shadow-amber-400/40 shadow-lg scale-[1.03]"
       : s === "complete"
       ? "bg-green-500/20 border-green-400/60"
+      : s === "skipped"
+      ? "bg-rose-500/10 border-rose-400/30"
       : "bg-slate-700/30 border-slate-600/30";
   const dot =
     s === "active"
       ? "bg-amber-400 animate-pulse"
       : s === "complete"
       ? "bg-green-400"
+      : s === "skipped"
+      ? "bg-rose-400"
       : "bg-slate-500";
 
   return (
@@ -133,6 +137,9 @@ function PipelineNode({
         <span className="text-amber-100 text-xs font-medium">{label}</span>
         {s === "complete" && (
           <span className="ml-auto text-green-400 text-xs">✓</span>
+        )}
+        {s === "skipped" && (
+          <span className="ml-auto text-rose-400 text-xs">✗ failed</span>
         )}
       </div>
       <p className="text-amber-200/40 text-[10px] mt-1 ml-5">{sub}</p>
@@ -275,6 +282,18 @@ function usePipelineSimulation(
           set("story_gen", "complete");
           set("ogma_review", "complete");
 
+          // Check events to see if devi actually succeeded or failed
+          let elevenLabsSucceeded = true;
+          try {
+            const evRes = await fetch(`${apiUrl}/stories/${storyId}/events`);
+            if (evRes.ok) {
+              const events = await evRes.json() as Array<{ agent: string; event_type: string }>;
+              const deviFailed = events.some(e => e.agent === "devi" && e.event_type === "failed");
+              const deviCompleted = events.some(e => e.agent === "devi" && e.event_type === "completed");
+              if (deviFailed && !deviCompleted) elevenLabsSucceeded = false;
+            }
+          } catch { /* ignore */ }
+
           // After Ogma approves: parallel elevenlabs + fal_images (15-19s range)
           setTimeout(() => {
             if (!mountedRef.current) return;
@@ -283,7 +302,7 @@ function usePipelineSimulation(
 
             setTimeout(() => {
               if (!mountedRef.current) return;
-              set("elevenlabs", "complete");
+              set("elevenlabs", elevenLabsSucceeded ? "complete" : "skipped");
               set("fal_images", "complete");
 
               setTimeout(() => {
@@ -330,7 +349,8 @@ function usePipelineSimulation(
         set("fal_images", "active");
         setTimeout(() => {
           if (!mountedRef.current) return;
-          set("elevenlabs", "complete");
+          // Don't assume success in fallback — leave elevenlabs as active (unknown)
+          set("elevenlabs", "active");
           set("fal_images", "complete");
           setTimeout(() => {
             if (!mountedRef.current) return;
