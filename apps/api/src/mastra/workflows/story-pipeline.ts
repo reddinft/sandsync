@@ -416,7 +416,7 @@ Return ONLY valid JSON with the same structure as before.`;
         });
 
         try {
-          const voiceId = "SOYHLrjzK2X1ezoPC6cr"; // Anansi's voice — the storyteller narrates
+          const voiceId = "dhwafD61uVd8h85wAZSE"; // Anansi's voice — the storyteller narrates
           // ElevenLabs — full chapters take 30-40s, give 65s total
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 65_000);
@@ -538,7 +538,7 @@ Return ONLY valid JSON with the same structure as before.`;
         audioUrl = `/audio/${storyId}/chapter_${chapterNum}.mp3`;
         deviTrace = {
           latency_ms: 0,
-          voice_id: "SOYHLrjzK2X1ezoPC6cr",
+          voice_id: "dhwafD61uVd8h85wAZSE",
           audio_duration_s: 0,
           cost_usd: 0,
           dry_run: true,
