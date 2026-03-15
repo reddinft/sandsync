@@ -659,6 +659,10 @@ Return ONLY valid JSON with the same structure as before.`;
           reviewed_content: finalOgmaReview?.reviewed_content || currentContent,
           quality_score: finalOgmaScore,
           agent_trace: agentTrace,
+          image_url: imageUrl ?? null,
+          audio_url: audioUrl ?? null,
+          image_source: imageSource ?? null,
+          audio_source: audioSource ?? null,
         });
 
       if (chapterError) {
