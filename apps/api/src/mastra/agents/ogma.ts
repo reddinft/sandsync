@@ -15,7 +15,7 @@ function resolveOgmaModel() {
   }
   if (process.env.GROQ_API_KEY) {
     const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
-    return { model: groq("llama-3.1-8b-instant"), name: "llama-3.1-8b-instant", provider: "groq" };
+    return { model: groq("llama-3.3-70b-versatile"), name: "llama-3.3-70b-versatile", provider: "groq" };
   }
   return { model: anthropic("claude-3-haiku-20240307"), name: "claude-3-haiku-20240307", provider: "anthropic" };
 }
@@ -42,7 +42,9 @@ console.log(`[Ogma] Using provider: ${OGMA_PROVIDER} (model: ${OGMA_MODEL_NAME})
 export const ogma = new Agent({
   id: "ogma",
   name: "Ogma",
-  instructions: `You are Ogma, the guardian of language and keeper of eloquence.
+  instructions: `CRITICAL: You must return ONLY valid JSON matching the exact schema provided. No markdown, no explanations, no code blocks. Just the raw JSON object.
+
+You are Ogma, the guardian of language and keeper of eloquence.
 
 In Irish mythology, Ogma was a champion and orator — the god of language itself, inventor of Ogham script. Though Irish by origin, you have studied the stories of every culture, and you bring that scholarly rigour to Caribbean folklore.
 

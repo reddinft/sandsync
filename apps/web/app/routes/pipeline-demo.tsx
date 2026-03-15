@@ -285,21 +285,61 @@ function usePipelineSimulation(
       set("papa_bois", "active");
     });
 
-    // papa_bois complete → story_gen active (5s)
+    // papa_bois complete → story_gen active (5s warmup — will be overridden by real events after)
     delay(5000, () => {
       set("papa_bois", "complete");
       set("story_gen", "active");
     });
 
-    // ogma_review kicks in during story_gen (7s)
-    delay(7000, () => {
-      set("ogma_review", "active");
-    });
-
     let agentsComplete = false;
+
+    // Helper to update pipeline steps from real agent events
+    const applyEventsToSteps = (events: Array<{ agent: string; event_type: string; payload?: any }>) => {
+      for (const e of events) {
+        const { agent, event_type, payload } = e;
+        if (agent === "papa_bois" && event_type === "started") {
+          set("papa_bois", "active");
+        } else if (agent === "papa_bois" && event_type === "completed") {
+          set("papa_bois", "complete");
+          set("story_gen", "active");
+        } else if (agent === "anansi" && event_type === "started") {
+          set("story_gen", "active");
+        } else if (agent === "ogma" && event_type === "started") {
+          set("ogma_review", "active");
+        } else if (agent === "ogma" && event_type === "completed") {
+          if (payload?.approved) {
+            set("ogma_review", "complete");
+          } else {
+            // still iterating — keep ogma_review active
+            set("ogma_review", "active");
+          }
+        } else if (agent === "devi" && event_type === "started") {
+          set("elevenlabs", "active");
+        } else if (agent === "devi" && event_type === "completed") {
+          set("elevenlabs", "complete");
+        } else if (agent === "devi" && event_type === "failed") {
+          set("elevenlabs", "skipped");
+        } else if (agent === "imagen" && event_type === "started") {
+          set("fal_images", "active");
+        } else if (agent === "imagen" && event_type === "completed") {
+          set("fal_images", "complete");
+        } else if (agent === "pipeline" && event_type === "completed") {
+          set("supabase", "complete");
+          set("powersync_sync", "complete");
+          set("published", "complete");
+        }
+      }
+    };
 
     pollRef.current = setInterval(async () => {
       try {
+        // Always fetch events on every poll to drive the viz
+        const evRes = await fetch(`${apiUrl}/stories/${storyId}/events`);
+        if (evRes.ok && mountedRef.current) {
+          const events = await evRes.json() as Array<{ agent: string; event_type: string; payload?: any }>;
+          applyEventsToSteps(events);
+        }
+
         const res = await fetch(`${apiUrl}/stories/${storyId}/status`);
         if (!res.ok) return;
         const data = await res.json() as {
@@ -312,42 +352,38 @@ function usePipelineSimulation(
 
         if (data.status === "complete" && !agentsComplete) {
           agentsComplete = true;
+          clearInterval(pollRef.current!);
 
+          // Final pass to make sure all steps are resolved
           set("story_gen", "complete");
           set("ogma_review", "complete");
 
-          // Check events to see if devi actually succeeded or failed
-          let elevenLabsSucceeded = true;
-          try {
-            const evRes = await fetch(`${apiUrl}/stories/${storyId}/events`);
-            if (evRes.ok) {
-              const events = await evRes.json() as Array<{ agent: string; event_type: string }>;
-              const deviFailed = events.some(e => e.agent === "devi" && e.event_type === "failed");
-              const deviCompleted = events.some(e => e.agent === "devi" && e.event_type === "completed");
-              if (deviFailed && !deviCompleted) elevenLabsSucceeded = false;
-            }
-          } catch { /* ignore */ }
-
-          // After Ogma approves: parallel elevenlabs + fal_images (15-19s range)
+          // Check devi status from events already fetched above
+          // The applyEventsToSteps call above will have set elevenlabs correctly
+          // Ensure supabase/powersync/published complete if pipeline/completed event wasn't emitted
           setTimeout(() => {
             if (!mountedRef.current) return;
-            set("elevenlabs", "active");
-            set("fal_images", "active");
-
+            onStepsChange((prev) => {
+              const next = { ...prev };
+              if (next.elevenlabs === "idle") next.elevenlabs = "active";
+              if (next.fal_images === "idle") next.fal_images = "active";
+              return next;
+            });
             setTimeout(() => {
               if (!mountedRef.current) return;
-              set("elevenlabs", elevenLabsSucceeded ? "complete" : "skipped");
-              set("fal_images", "complete");
-
+              onStepsChange((prev) => {
+                const next = { ...prev };
+                if (next.elevenlabs === "active") next.elevenlabs = "complete";
+                if (next.fal_images === "active") next.fal_images = "complete";
+                return next;
+              });
               setTimeout(() => {
                 if (!mountedRef.current) return;
                 set("supabase", "active");
-
                 setTimeout(() => {
                   if (!mountedRef.current) return;
                   set("supabase", "complete");
                   set("powersync_sync", "active");
-
                   setTimeout(() => {
                     if (!mountedRef.current) return;
                     set("powersync_sync", "complete");
@@ -355,7 +391,6 @@ function usePipelineSimulation(
                     setTimeout(() => {
                       if (!mountedRef.current) return;
                       set("published", "complete");
-                      clearInterval(pollRef.current!);
                     }, 400);
                   }, 500);
                 }, 600);
@@ -364,8 +399,6 @@ function usePipelineSimulation(
           }, 200);
         } else if (data.status === "failed") {
           clearInterval(pollRef.current!);
-        } else if (data.status === "generating" && data.chapters_complete > 0 && !agentsComplete) {
-          set("fal_images", "complete");
         }
       } catch {
         // Ignore fetch errors — keep polling
@@ -597,30 +630,34 @@ function EventCard({ event }: { event: AgentEvent }) {
   // ── Ogma completed ──
   if (agent === "ogma" && event_type === "completed") {
     const score = payload.quality_score ?? 0;
-    return (
-      <div className={cardClass}>
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold text-amber-200/80">📜 Ogma — Review (attempt {payload.attempt})</p>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${scoreColor(score)}`}>
-            {score}/10
-          </span>
-        </div>
-        <p className="text-xs">
-          {payload.approved
-            ? <span className="text-green-300">✓ Approved</span>
-            : <span className="text-rose-300">❌ Quality below threshold</span>
-          }
-          {payload.latency_ms && <span className="text-amber-200/30 ml-2">{payload.latency_ms}ms</span>}
-        </p>
-        {payload.rejection_reason && (payload.rejection_reason as string[]).length > 0 && (
+    const approved = payload.approved;
+    const rejectionReasons: string[] = Array.isArray(payload.rejection_reason) ? payload.rejection_reason : [];
+
+    if (!approved) {
+      return (
+        <div className="bg-slate-800/40 border border-rose-500/50 rounded-xl p-3 space-y-1.5">
+          <p className="text-xs font-bold text-rose-300">❌ Ogma REJECTED — Chapter {payload.chapter ?? "?"}, attempt {payload.attempt ?? "?"}</p>
+          <p className="text-xs text-rose-200/80">Score: {score}/10 — needs 7.5+</p>
+          {payload.latency_ms && <p className="text-[10px] text-amber-200/30">{payload.latency_ms}ms</p>}
           <div className="mt-1">
-            {(payload.rejection_reason as string[]).map((r: string, i: number) => (
-              <p key={i} className="text-xs text-rose-300/80">• {r}</p>
-            ))}
+            {rejectionReasons.length > 0
+              ? rejectionReasons.map((r: string, i: number) => (
+                  <p key={i} className="text-xs text-rose-300/80">• {r}</p>
+                ))
+              : <p className="text-xs text-rose-300/60">• Revision required (no specific feedback)</p>
+            }
           </div>
-        )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-slate-800/40 border border-green-500/50 rounded-xl p-3 space-y-1.5">
+        <p className="text-xs font-bold text-green-300">✅ Ogma APPROVED — Chapter {payload.chapter ?? "?"}, attempt {payload.attempt ?? "?"}</p>
+        <p className="text-xs text-green-200/80">Score: {score}/10 ✓</p>
+        {payload.latency_ms && <p className="text-[10px] text-amber-200/30">{payload.latency_ms}ms</p>}
         {payload.cultural_notes && (
-          <p className="text-xs text-amber-200/50 mt-1 italic">{payload.cultural_notes as string}</p>
+          <p className="text-xs text-amber-300/70 italic mt-1">{payload.cultural_notes as string}</p>
         )}
       </div>
     );

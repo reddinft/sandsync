@@ -64,6 +64,25 @@ function StoryReaderPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // If API returns but image_url is missing, retry after 2s (PowerSync may not have synced yet)
+  useEffect(() => {
+    if (apiChapters.length > 0 && !apiChapters[0]?.image_url) {
+      const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
+      const t = setTimeout(() => {
+        fetch(`${apiUrl}/stories/${id}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data) {
+              setApiStory(data);
+              setApiChapters(data.chapters ?? []);
+            }
+          })
+          .catch(() => {});
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [apiChapters]);
+
   // Merge: PowerSync data wins if available (real-time), else fall back to API fetch
   const story = (storyArray && storyArray.length > 0 ? storyArray[0] : null) ?? apiStory;
   // Merge chapters: prefer PS for real-time content, but fill in image_url/audio_url from API
@@ -74,8 +93,8 @@ function StoryReaderPage() {
         const apiCh = apiChapters.find((a: any) => a.chapter_number === psCh.chapter_number);
         return {
           ...psCh,
-          image_url: psCh.image_url ?? apiCh?.image_url ?? null,
-          audio_url: psCh.audio_url ?? apiCh?.audio_url ?? null,
+          image_url: psCh.image_url || apiCh?.image_url || null,
+          audio_url: psCh.audio_url || apiCh?.audio_url || null,
         };
       })
     : apiChapters;
