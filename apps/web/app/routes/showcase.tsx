@@ -214,7 +214,11 @@ function ShowcasePage() {
         if (!r.ok) throw new Error(`API ${r.status}`);
         return r.json();
       })
-      .then((data) => setStories(data as StoryCard[]))
+      .then((data) => {
+          // Only show stories that have a cover image
+          const all = data as StoryCard[];
+          setStories(all.filter((s) => s.first_chapter?.image_url));
+        })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -225,7 +229,7 @@ function ShowcasePage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-amber-100">🌴 Story Showcase</h1>
         <p className="text-sm text-amber-200/50 mt-1">
-          Previously generated Caribbean folklore stories
+          {loading ? "Loading stories…" : `${stories.length} ${stories.length === 1 ? "story" : "stories"} — Previously generated Caribbean folklore`}
         </p>
       </div>
 
@@ -256,7 +260,7 @@ function ShowcasePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {stories.map((s) => (
+          {stories.filter(s => s.first_chapter?.image_url).map((s) => (
             <StoryCardItem key={s.id} story={s} />
           ))}
         </div>

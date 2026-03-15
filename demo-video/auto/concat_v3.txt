@@ -1,0 +1,8 @@
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_intro_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_a_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_b_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_c_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_d_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_e_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_scene_f_composed_norm.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_outro_composed_norm.mp4'

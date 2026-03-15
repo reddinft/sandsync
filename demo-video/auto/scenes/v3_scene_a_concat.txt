@@ -1,0 +1,2 @@
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_slide_03.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/v3_slide_05.mp4'

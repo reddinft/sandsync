@@ -402,12 +402,15 @@ Return ONLY valid JSON with the same structure as before.`;
       }
 
       // ── 2c. Devi — Voice narration (with Kokoro fallback) ─────────────────────
+      // NOTE: Devi and Imagen are fully isolated — Imagen ALWAYS runs even if Devi fails.
 
       let audioUrl: string | null = null;
       let audioSource = "elevenlabs";
       let deviTrace: any = null;
       const textToNarrate = currentContent;
 
+      // Devi is fully wrapped — any unhandled throw is caught here so Imagen always runs
+      try {
       if (!dryRun) {
         console.log(`  [Devi] 🎙️  Generating narration for chapter ${chapterNum}...`);
         const deviT0 = Date.now();
@@ -544,6 +547,14 @@ Return ONLY valid JSON with the same structure as before.`;
           dry_run: true,
         };
         console.log(`  [Devi] 🔇 Dry-run mode — skipping ElevenLabs, mocking audio_url`);
+      }
+      } catch (deviGuardErr: any) {
+        // Safety net: if Devi somehow throws outside its inner try/catch, log and continue to Imagen
+        console.warn(`  [Devi] 🛡️  Guard caught unhandled error: ${deviGuardErr.message} — Imagen will still run`);
+        await writeAgentEvent(supabase, storyId, "devi", "failed", {
+          chapter: chapterNum,
+          error: `[guard] ${deviGuardErr.message}`,
+        });
       }
 
       // ── 2c-bis. Image generation (Gemini Imagen with Flux fallback) ────────────────────────
