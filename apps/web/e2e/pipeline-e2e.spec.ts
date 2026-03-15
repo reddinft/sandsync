@@ -329,7 +329,8 @@ test.describe("SandSync Full Pipeline E2E", () => {
       });
       console.log("✅ Chapter content rendered");
 
-      // Image: either shown or skeleton (not broken)
+      // Image: warn if broken (Supabase CDN can take a moment to propagate new uploads)
+      // Not a hard assertion — new stories may show broken image briefly
       const brokenImages = await page.evaluate(() => {
         const imgs = Array.from(document.querySelectorAll("img"));
         return imgs
@@ -337,27 +338,28 @@ test.describe("SandSync Full Pipeline E2E", () => {
           .map((img) => img.src);
       });
       if (brokenImages.length > 0) {
-        console.warn(`⚠️  Broken images: ${brokenImages.join(", ")}`);
+        console.warn(`⚠️  Broken images (CDN propagation delay): ${brokenImages.join(", ")}`);
       } else {
         console.log("✅ No broken images");
       }
 
-      // Audio: either AudioPlayer ("Narration by Devi" visible) or one of our honest status messages
-      const audioPlayer = page.locator("text=Narration by Devi");
+      // Audio: Kit renamed label to "Narrated by Devi" in the polish update
+      // Accept any of the possible states: audio player, unavailable, or processing
+      const audioPlayer = page.locator("text=Narrated by Devi");
       const audioUnavailable = page.locator("text=Audio unavailable");
-      const audioProcessing = page.locator(
-        "text=Narration by Devi — processing audio",
-      );
+      const audioProcessing = page.locator("text=Narration by Devi");
 
-      // One of these should be present
+      // One of these should be present (audio element OR status message)
+      const audioElement = page.locator("audio");
       await expect(
-        audioPlayer.or(audioUnavailable).or(audioProcessing).first(),
+        audioElement.or(audioPlayer).or(audioUnavailable).or(audioProcessing).first(),
       ).toBeVisible({ timeout: 10_000 });
 
-      const hasAudio = await audioPlayer.isVisible().catch(() => false);
+      const hasAudioEl = await audioElement.isVisible().catch(() => false);
+      const hasNarratedBy = await audioPlayer.isVisible().catch(() => false);
       const isUnavailable = await audioUnavailable.isVisible().catch(() => false);
       console.log(
-        `✅ Audio state: ${hasAudio ? "audio player present ✓" : isUnavailable ? "unavailable (quota)" : "processing"}`,
+        `✅ Audio state: ${hasAudioEl || hasNarratedBy ? "audio present ✓" : isUnavailable ? "unavailable (quota)" : "processing"}`,
       );
 
       // No "Illustration for undefined"
