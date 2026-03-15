@@ -92,6 +92,40 @@ const GENRES = [
   { label: "Mama Dlo river spirit", emoji: "🐍", value: "mama-dlo" },
 ];
 
+// ── Sponsor Strip ─────────────────────────────────────────────────────────────
+
+const SPONSORS = [
+  { name: "PowerSync", emoji: "⚡", url: "https://powersync.com" },
+  { name: "Supabase", emoji: "🗄️", url: "https://supabase.com" },
+  { name: "Mastra", emoji: "🤖", url: "https://mastra.ai" },
+  { name: "ElevenLabs", emoji: "🔊", url: "https://elevenlabs.io" },
+  { name: "fal.ai", emoji: "🎨", url: "https://fal.ai" },
+  { name: "Groq", emoji: "⚡", url: "https://groq.com" },
+  { name: "TanStack", emoji: "🔗", url: "https://tanstack.com" },
+];
+
+function SponsorStrip() {
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-700/40">
+      <p className="text-[9px] text-amber-200/30 uppercase tracking-widest font-semibold mb-2">Powered by</p>
+      <div className="flex flex-wrap gap-2">
+        {SPONSORS.map((s) => (
+          <a
+            key={s.name}
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/30 hover:border-amber-400/40 hover:bg-amber-500/10 transition-all text-[10px] font-medium text-amber-200/60 hover:text-amber-200"
+          >
+            <span>{s.emoji}</span>
+            <span>{s.name}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PipelineNode({
@@ -735,6 +769,11 @@ function DebugPanel({ storyId, events }: { storyId: string; events: AgentEvent[]
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [events.length]);
 
+  // Extract pipeline/completed summary if available
+  const completedEvent = events.find(e => e.agent === "pipeline" && e.event_type === "completed");
+  const totalMs = completedEvent?.payload?.total_latency_ms;
+  const totalCost = completedEvent?.payload?.total_cost_usd;
+
   return (
     <div className="bg-slate-800/50 backdrop-blur-lg rounded-2xl border border-slate-700/50 p-4 flex flex-col h-full min-h-0">
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
@@ -743,6 +782,23 @@ function DebugPanel({ storyId, events }: { storyId: string; events: AgentEvent[]
           {storyId.slice(0, 8)}…
         </span>
       </div>
+
+      {/* Pipeline completion summary banner */}
+      {completedEvent && (
+        <div className="mb-3 flex-shrink-0 bg-green-500/10 border border-green-400/30 rounded-xl px-3 py-2.5 space-y-1">
+          {totalMs != null && (
+            <p className="text-sm font-semibold text-green-300">
+              ✅ Pipeline complete in {(totalMs / 1000).toFixed(1)}s
+            </p>
+          )}
+          {totalCost != null && (
+            <p className="text-xs text-amber-200/60">
+              💰 ${Number(totalCost).toFixed(3)} total — Claude + ElevenLabs + fal.ai FLUX
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto space-y-2 min-h-0 max-h-[600px] pr-1">
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
@@ -1468,6 +1524,8 @@ function PipelineDemoPage() {
                 </p>
               )}
             </div>
+
+            <SponsorStrip />
           </div>
 
           {/* Story Preview Panel (after completion) */}

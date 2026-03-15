@@ -14,30 +14,34 @@ export const Route = createRootRoute({
 
 function SyncStatusPill() {
   const syncStatus = usePowerSyncStatus();
+  const connected = syncStatus.connected && syncStatus.hasSynced;
+  const syncing = syncStatus.connected && !syncStatus.hasSynced;
+
   return (
     <span
       className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border font-mono transition-all duration-500 ${
-        !syncStatus.connected
-          ? "bg-red-500/20 text-red-400 border-red-400/30"
-          : syncStatus.hasSynced
-          ? "bg-green-500/20 text-green-400 border-green-400/30"
-          : "bg-amber-500/20 text-amber-400 border-amber-400/30"
+        connected
+          ? "bg-green-500/20 text-green-300 border-green-400/30"
+          : syncing
+          ? "bg-amber-500/20 text-amber-300 border-amber-400/30"
+          : "bg-slate-600/30 text-amber-200/50 border-slate-500/30"
       }`}
+      title={connected ? "PowerSync connected — syncing to all devices" : syncing ? "PowerSync connecting…" : "Offline — using local SQLite cache"}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full ${
-          !syncStatus.connected
-            ? "bg-red-400"
-            : syncStatus.hasSynced
-            ? "bg-green-400"
-            : "bg-amber-400 animate-pulse"
+          connected
+            ? "bg-green-400 animate-pulse"
+            : syncing
+            ? "bg-amber-400 animate-pulse"
+            : "bg-amber-200/30"
         }`}
       />
-      {!syncStatus.connected
-        ? "Offline"
-        : syncStatus.hasSynced
-        ? "Synced"
-        : "Syncing"}
+      {connected
+        ? "⚡ PowerSync synced"
+        : syncing
+        ? "⚡ Syncing…"
+        : "○ Offline — local SQLite"}
     </span>
   );
 }

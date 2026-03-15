@@ -105,14 +105,33 @@ function HomePage() {
   return (
     <div className="space-y-12">
       {/* HERO SECTION */}
-      <div className="relative min-h-[50vh] flex flex-col items-center justify-center text-center space-y-4 py-8">
+      <div className="relative min-h-[50vh] flex flex-col items-center justify-center text-center space-y-6 py-8">
         <h1 className="text-5xl md:text-7xl font-bold text-amber-100 leading-tight">
-          Summon a Story
+          🌴 SandSync
         </h1>
-        <p className="text-lg md:text-xl text-amber-200/80 max-w-2xl mx-auto leading-relaxed">
-          Generate AI tales woven from Trinidad & Tobago folklore. 
-          Where Anansi spins, Papa Bois guides, and spirits whisper.
+        <p className="text-lg md:text-2xl text-amber-200/80 max-w-2xl mx-auto leading-relaxed font-medium">
+          Caribbean folklore. AI-written. Narrated. Illustrated. Yours offline.
         </p>
+        <p className="text-sm text-amber-200/50 max-w-xl mx-auto">
+          Powered by PowerSync · Mastra · ElevenLabs · fal.ai · Supabase · Groq · TanStack
+        </p>
+        {/* Primary CTAs */}
+        <div className="flex flex-col sm:flex-row gap-3 mt-2">
+          <a
+            href="/pipeline-demo"
+            className="inline-flex items-center gap-2 bg-amber-100 text-indigo-950 hover:bg-amber-200 font-semibold rounded-xl px-6 py-3 text-sm transition-all shadow-lg shadow-amber-400/20 hover:shadow-amber-400/40"
+          >
+            <span>▶</span>
+            <span>Try the Demo</span>
+          </a>
+          <a
+            href="/showcase"
+            className="inline-flex items-center gap-2 bg-slate-700/50 border border-amber-400/30 text-amber-100 hover:border-amber-400/60 hover:bg-amber-500/10 font-semibold rounded-xl px-6 py-3 text-sm transition-all"
+          >
+            <span>📚</span>
+            <span>Browse Stories</span>
+          </a>
+        </div>
       </div>
 
       {/* FORM SECTION */}

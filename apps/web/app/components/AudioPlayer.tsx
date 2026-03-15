@@ -127,11 +127,14 @@ export function AudioPlayer({ src, chapterTitle }: AudioPlayerProps) {
   }
 
   return (
-    <div className="bg-slate-800/60 backdrop-blur rounded-xl border border-amber-200/20 px-5 py-5">
+    <div className="bg-gradient-to-br from-amber-900/20 to-slate-800/60 backdrop-blur rounded-xl border border-amber-400/20 px-5 py-5 shadow-lg shadow-amber-900/20">
       {/* Label */}
-      <div className="flex items-center gap-2 mb-4 text-sm font-medium text-amber-100">
-        <span>🎵</span>
-        <span>Narration by Devi</span>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm">🎙️</span>
+        <div>
+          <p className="text-sm font-medium text-amber-100">Narrated by Devi</p>
+          <p className="text-[10px] text-amber-200/40 font-mono">ElevenLabs · TTS v2</p>
+        </div>
       </div>
 
       {/* Hidden audio element */}

@@ -53,9 +53,17 @@ function badRequest(msg: string, corsHeaders?: Record<string, string>) {
 // ── Handlers ───────────────────────────────────────────────────────────────────
 
 async function handlePostStory(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
+  let body: any;
+  try { body = await req.json(); } catch { return badRequest("Invalid JSON body", corsHeaders); }
   const { userId, request: userRequest, shortStory } = body;
   if (!userId) return badRequest("userId is required", corsHeaders);
   if (!userRequest) return badRequest("request is required", corsHeaders);
+
+  const { data: story, error } = await supabase
+    .from("stories")
+    .insert({ user_id: userId, status: "queued" })
+    .select()
+    .single();
 
   if (error || !story) {
     console.error("[POST /stories] DB error:", error?.message);
