@@ -1,0 +1,6 @@
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_01_composed.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_02_composed.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_03_composed.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_04_composed.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_05_composed.mp4'
+file '/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_06_composed.mp4'

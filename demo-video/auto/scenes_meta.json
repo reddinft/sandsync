@@ -1,0 +1,57 @@
+{
+  "scene_01_vo": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_01_vo.mp3",
+    "duration": 12.910295,
+    "text": "Caribbean folklore has always lived in the voices of grandmo..."
+  },
+  "scene_02_vo": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_02_vo.mp3",
+    "duration": 9.98458,
+    "text": "Here are stories already written by our agents \u2014 illustrated..."
+  },
+  "scene_03_vo": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_03_vo.mp3",
+    "duration": 15.18585,
+    "text": "This is a living story. Illustrated by fal.ai. Narrated by D..."
+  },
+  "scene_04_vo_00s": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_04_vo_00s.mp3",
+    "duration": 11.470658,
+    "text": "Now let's generate a new story, live. Watch our five agents ..."
+  },
+  "scene_04_vo_15s": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_04_vo_15s.mp3",
+    "duration": 5.29415,
+    "text": "Anansi is writing now. Real Caribbean dialect. Real mytholog..."
+  },
+  "scene_04_vo_35s": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_04_vo_35s.mp3",
+    "duration": 5.34059,
+    "text": "Ogma is judging. Seven point five out of ten to pass. Anythi..."
+  },
+  "scene_04_vo_55s": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_04_vo_55s.mp3",
+    "duration": 5.665669,
+    "text": "Devi is narrating with ElevenLabs. fal.ai is painting the il..."
+  },
+  "scene_04_vo_80s": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_04_vo_80s.mp3",
+    "duration": 5.572789,
+    "text": "And PowerSync is broadcasting this story to every connected ..."
+  },
+  "scene_05_vo": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_05_vo.mp3",
+    "duration": 9.613061,
+    "text": "Done. A complete story \u2014 written, judged, narrated, illustra..."
+  },
+  "scene_06_vo": {
+    "path": "/Users/loki/projects/sandsync/demo-video/auto/vo/scene_06_vo.mp3",
+    "duration": 21.083719,
+    "text": "SandSync was built with PowerSync at its core \u2014 not as decor..."
+  },
+  "scene_03_raw": "/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_03_raw.webm",
+  "new_story_url": "https://web-eta-black-15.vercel.app/stories/40548f3d-ffd7-476b-94a3-9fdaf5f0c167",
+  "scene_04_raw": "/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_04_raw.webm",
+  "scene_05_raw": "/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_05_raw.webm",
+  "scene_06_raw": "/Users/loki/projects/sandsync/demo-video/auto/scenes/scene_06_raw.webm"
+}
