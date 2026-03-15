@@ -22,6 +22,8 @@ const appSchema = new Schema({
       new Column({ name: "content", type: ColumnType.TEXT }),
       new Column({ name: "reviewed_content", type: ColumnType.TEXT }),
       new Column({ name: "audio_url", type: ColumnType.TEXT }),
+      new Column({ name: "image_url", type: ColumnType.TEXT }),
+      new Column({ name: "illustration_prompt", type: ColumnType.TEXT }),
       new Column({ name: "agent_trace", type: ColumnType.TEXT }),
       new Column({ name: "created_at", type: ColumnType.TEXT }),
       new Column({ name: "updated_at", type: ColumnType.TEXT }),
@@ -66,6 +68,8 @@ export type StoryChapter = {
   content: string;
   reviewed_content?: string;
   audio_url?: string;
+  image_url?: string;
+  illustration_prompt?: string;
   agent_trace?: Record<string, unknown>;
   created_at: string;
   updated_at: string;

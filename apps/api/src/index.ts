@@ -209,6 +209,24 @@ async function handlePostStoryTranscribe(req: Request, corsHeaders: Record<strin
   }, 200, corsHeaders);
 }
 
+async function handleGetStory(storyId: string, corsHeaders: Record<string, string>): Promise<Response> {
+  const { data: story, error } = await supabase
+    .from("stories")
+    .select("id, title, genre, status, created_at")
+    .eq("id", storyId)
+    .single();
+
+  if (error || !story) return notFound(corsHeaders);
+
+  const { data: chapters } = await supabase
+    .from("story_chapters")
+    .select("id, chapter_number, title, content, reviewed_content, image_url, audio_url, quality_score, created_at")
+    .eq("story_id", storyId)
+    .order("chapter_number");
+
+  return json({ ...story, chapters: chapters ?? [] }, 200, corsHeaders);
+}
+
 async function handleGetStoryPreview(storyId: string, corsHeaders: Record<string, string>): Promise<Response> {
   const { data: story, error } = await supabase
     .from("stories")
@@ -366,6 +384,12 @@ const server = Bun.serve({
       const previewMatch = pathname.match(/^\/stories\/([^/]+)\/preview$/);
       if (previewMatch && method === "GET") {
         return await handleGetStoryPreview(previewMatch[1], corsHeaders);
+      }
+
+      // GET /stories/:id — full story + all chapters
+      const storyMatch = pathname.match(/^\/stories\/([^/]+)$/);
+      if (storyMatch && method === "GET") {
+        return await handleGetStory(storyMatch[1], corsHeaders);
       }
 
       // GET /stories/:id/chapters/:n/audio

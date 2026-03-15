@@ -449,7 +449,8 @@ Return ONLY valid JSON with the same structure as before.`;
             // Fallback 1: Deepgram Aura TTS (uses DEEPGRAM_API_KEY, ~$0.015/1k chars)
             const deepgramNarration = await generateNarrationDeepgram(textToNarrate);
             if (deepgramNarration) {
-              audioUrl = await uploadKokoroAudio(deepgramNarration.audioBuffer, storyId, chapterNum);
+              const uploadedDeepgramUrl = await uploadAudioToSupabase(deepgramNarration.audioBuffer, storyId, chapterNum);
+              audioUrl = uploadedDeepgramUrl || `/audio/${storyId}/chapter_${chapterNum}.mp3`;
               audioSource = "deepgram";
               const deviLatency = Date.now() - deviT0;
               deviTrace = {

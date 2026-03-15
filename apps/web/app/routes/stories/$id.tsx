@@ -36,9 +36,37 @@ const AGENT_LABELS: Record<string, string> = {
 function StoryReaderPage() {
   const { id } = Route.useParams();
   const syncStatus = usePowerSyncStatus();
+
+  // PowerSync queries (secondary — real-time updates if PS is connected)
   const { data: storyArray } = useQuery<Story>("SELECT * FROM stories WHERE id = ?", [id]);
-  const { data: chapters } = useQuery<StoryChapter>("SELECT * FROM story_chapters WHERE story_id = ? ORDER BY chapter_number", [id]);
+  const { data: psChapters } = useQuery<StoryChapter>("SELECT * FROM story_chapters WHERE story_id = ? ORDER BY chapter_number", [id]);
   const { data: agentEvents } = useQuery<any>("SELECT * FROM agent_events WHERE story_id = ? ORDER BY created_at DESC", [id]);
+
+  // API fetch state (primary source)
+  const [apiStory, setApiStory] = useState<any>(null);
+  const [apiChapters, setApiChapters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch story from API on mount
+  useEffect(() => {
+    const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
+    fetch(`${apiUrl}/stories/${id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setApiStory(data);
+          setApiChapters(data.chapters ?? []);
+        }
+      })
+      .catch(() => {
+        // Fetch failed — will fall back to PowerSync or show not found
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // Merge: PowerSync data wins if available (real-time), else fall back to API fetch
+  const story = (storyArray && storyArray.length > 0 ? storyArray[0] : null) ?? apiStory;
+  const chapters = (psChapters && psChapters.length > 0 ? psChapters : apiChapters);
 
   // Helper to convert relative audio URLs to absolute API URLs
   const getAudioUrl = (audioUrl: string | null) => {
@@ -48,7 +76,6 @@ function StoryReaderPage() {
     return `${apiUrl}${audioUrl}`;
   };
 
-  const story = storyArray && storyArray.length > 0 ? storyArray[0] : null;
   const [agentStatuses, setAgentStatuses] = useState<
     Record<string, { completed: boolean; latency?: number }>
   >({
@@ -103,6 +130,16 @@ function StoryReaderPage() {
       setAgentStatuses(statuses);
     }
   }, [agentEvents]);
+
+  // Loading state — show spinner while API fetch is in progress
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="text-5xl mb-4 animate-pulse">📖</div>
+        <p className="text-amber-400/60 text-lg font-medium">Loading story...</p>
+      </div>
+    );
+  }
 
   if (!story) {
     return (
@@ -286,7 +323,7 @@ function StoryReaderPage() {
 
               {/* Chapter content */}
               <div className="prose prose-amber prose-invert max-w-none">
-                {chapter.content.split("\n\n").map((paragraph: string, i: number) => (
+                {(chapter.content || "").split("\n\n").map((paragraph: string, i: number) => (
                   <p
                     key={i}
                     className="text-amber-100/85 leading-relaxed text-base md:text-lg mb-5 first:text-lg first:font-semibold first:text-amber-200"
