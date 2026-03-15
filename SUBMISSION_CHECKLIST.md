@@ -9,26 +9,26 @@
 
 ### 1. Repository
 - [ ] GitHub repo is **public**: https://github.com/reddinft/sandsync
-- [ ] `README.md` exists and describes the project clearly
-- [ ] README includes: what SandSync is, how to run locally, architecture overview
-- [ ] README links to live demo URL
+- [x] `README.md` exists and describes the project clearly ✅ _(rewritten 2026-03-15)_
+- [x] README includes: what SandSync is, how to run locally, architecture overview ✅
+- [x] README links to live demo URL ✅
 - [ ] Code is committed (no empty repo, no placeholder branches)
 - [ ] `nissan` added as admin collaborator (per workspace policy)
 
 ### 2. Live Demo
-- [ ] Frontend live at: https://web-eta-black-15.vercel.app ✅ _(verify still up day-of)_
-- [ ] Pipeline demo page live at: https://web-eta-black-15.vercel.app/pipeline-demo ✅ _(verify still up day-of)_
-- [ ] API responding at: https://sandsync-api.fly.dev ✅ _(verify Fly.io app is running)_
-- [ ] Pipeline demo completes end-to-end without error (Papa Bois → Anansi → Ogma → Firefly + Devi)
+- [x] Frontend live at: https://web-eta-black-15.vercel.app ✅ _(confirmed 2026-03-15)_
+- [x] Pipeline demo page live at: https://web-eta-black-15.vercel.app/pipeline-demo ✅ _(confirm still up day-of)_
+- [x] API responding at: https://sandsync-api.fly.dev ✅ _(confirmed 2026-03-15)_
+- [x] Pipeline demo completes end-to-end without error ✅ _(confirmed 2026-03-15 — ElevenLabs audio fixed, fal.ai images working)_
 - [ ] PowerSync Sync Streams visibly delivering chapter updates in demo
 
 ### 3. Architecture Description
-- [ ] Architecture section in README (or separate `ARCHITECTURE.md`)
-- [ ] Must explicitly name **PowerSync Sync Streams** and describe their role
-- [ ] Must show data flow: Client → PowerSync SDK → Local SQLite → PowerSync Service → Supabase
-- [ ] Offline scenario described in text (not just diagram)
-- [ ] All 5 agents named with their roles
-- [ ] Tech stack table present (PowerSync, Supabase, Mastra, TanStack, Claude, fal.ai, Deepgram)
+- [x] Architecture section in README (or separate `ARCHITECTURE.md`) ✅ _(both written 2026-03-15)_
+- [x] Must explicitly name **PowerSync Sync Streams** and describe their role ✅
+- [x] Must show data flow: Client → PowerSync SDK → Local SQLite → PowerSync Service → Supabase ✅
+- [x] Offline scenario described in text (not just diagram) ✅ _(ARCHITECTURE.md Offline Walkthrough section)_
+- [x] All 5 agents named with their roles ✅ _(README + ARCHITECTURE.md)_
+- [x] Tech stack table present (PowerSync, Supabase, Mastra, TanStack, Claude, fal.ai, Deepgram) ✅
 
 ### 4. Demo Video
 - [ ] Video recorded (max duration: check hackathon rules — typically 2–3 minutes)
@@ -53,33 +53,33 @@
 ## 🟡 BONUS PRIZE REQUIREMENTS
 
 ### 🏅 Best Local-First Submission ($500)
-- [ ] README or architecture doc explicitly claims "local-first"
-- [ ] Offline scenario documented: what works without internet
-- [ ] PowerSync local SQLite described as the **primary data layer** (not a cache)
-- [ ] Sync reconciliation behaviour documented (what happens on reconnect)
+- [x] README or architecture doc explicitly claims "local-first" ✅
+- [x] Offline scenario documented: what works without internet ✅ _(ARCHITECTURE.md — Offline Scenario Walkthrough)_
+- [x] PowerSync local SQLite described as the **primary data layer** (not a cache) ✅
+- [x] Sync reconciliation behaviour documented (what happens on reconnect) ✅
 - [ ] Demo or video shows offline → reconnect → sync scenario
-- [ ] Slide 6 of pitch deck covers this ✅
+- [x] Slide 6 of pitch deck covers this ✅
 
 ### 🏅 Best Submission Using Supabase ($1,000 credits)
-- [ ] Supabase project is active: https://supabase.com/dashboard/project/houtondlrbwaosdwqyiu ✅
-- [ ] Supabase used for: Postgres (source of truth), RLS (auth), Storage (media assets)
-- [ ] Promo code applied: POWERSYNC-DEW6-3JUM-16A8-JA2G ✅
-- [ ] README mentions Supabase role explicitly
-- [ ] RLS policies documented (shows security thinking, not just usage)
-- [ ] Supabase integration visible in architecture diagram
+- [x] Supabase project is active: https://supabase.com/dashboard/project/houtondlrbwaosdwqyiu ✅
+- [x] Supabase used for: Postgres (source of truth), RLS (auth), Storage (media assets) ✅
+- [x] Promo code applied: POWERSYNC-DEW6-3JUM-16A8-JA2G ✅
+- [x] README mentions Supabase role explicitly ✅ _(Sponsor Integrations section)_
+- [x] RLS policies documented (shows security thinking, not just usage) ✅ _(ARCHITECTURE.md Database Schema section)_
+- [x] Supabase integration visible in architecture diagram ✅
 
 ### 🏅 Best Submission Using Mastra ($500 Amazon gift card)
-- [ ] Mastra version pinned in `package.json`
-- [ ] Papa Bois orchestrator agent uses Mastra's native workflow primitives (not just called "Mastra")
-- [ ] Agent-to-agent handoffs (Papa Bois → Anansi → Ogma) use Mastra's workflow API
-- [ ] README section dedicated to "Multi-Agent Pipeline" with Mastra highlighted
-- [ ] Code examples of Mastra agent definitions in README or linked docs
+- [x] Mastra version pinned in `package.json` ✅ _(@mastra/core ^1.10.0)_
+- [x] Papa Bois orchestrator agent uses Mastra's native workflow primitives (not just called "Mastra") ✅
+- [x] Agent-to-agent handoffs (Papa Bois → Anansi → Ogma) use Mastra's workflow API ✅
+- [x] README section dedicated to "Multi-Agent Pipeline" with Mastra highlighted ✅ _(The Five Agents section)_
+- [x] Code examples of Mastra agent definitions in README or linked docs ✅ _(ARCHITECTURE.md Agent Pipeline section)_
 
 ### 🏅 Best Submission Using TanStack ($1:1 with Tanner Linsley + swag)
-- [ ] TanStack Router version pinned in `package.json`
-- [ ] TanStack Router used for: full SPA routing, pipeline-demo page, type-safe routes
-- [ ] Not just `@tanstack/react-query` — **Router** specifically (that's the prize category)
-- [ ] README mentions TanStack Router and its role
+- [x] TanStack Router version pinned in `package.json` ✅ _(@tanstack/react-router ^1.166.3)_
+- [x] TanStack Router used for: full SPA routing, pipeline-demo page, type-safe routes ✅
+- [x] Not just `@tanstack/react-query` — **Router** specifically (that's the prize category) ✅
+- [x] README mentions TanStack Router and its role ✅ _(Tech Stack table + Sponsor Integrations)_
 - [ ] Type-safe route definitions visible in code (this is what Tanner will look for)
 
 ---
@@ -131,8 +131,8 @@
 
 ## 📋 NICE TO HAVE (If Time Permits)
 
-- [ ] `ARCHITECTURE.md` as a standalone file (not buried in README)
-- [ ] Mermaid or ASCII diagram committed to repo
+- [x] `ARCHITECTURE.md` as a standalone file (not buried in README) ✅ _(created 2026-03-15)_
+- [x] Mermaid or ASCII diagram committed to repo ✅ _(Mermaid in README, ASCII in ARCHITECTURE.md)_
 - [ ] `AGENTS.md` in repo documenting each agent's role, model, and prompt structure
 - [ ] Offline demo GIF in README (very visible, very memorable for judges)
 - [ ] `PITCH_DECK.md` committed to repo (shows preparation and professionalism)
@@ -153,4 +153,4 @@ If you only have 4 hours left, do these in order:
 ---
 
 *Checklist prepared by Sara (docs specialist) · OpenClaw Agent Team · Redditech Pty Ltd*
-*Last updated: 2026-03-14*
+*Last updated: 2026-03-15 — Docs overhaul by Sara (OpenClaw). README rewritten with correct stack (Sonnet 4.5 + Groq Llama, not Haiku + qwen3:4b). ARCHITECTURE.md created. Checklist updated.*
