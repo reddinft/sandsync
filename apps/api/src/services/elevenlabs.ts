@@ -12,7 +12,7 @@
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 const DEFAULT_VOICE_ID = "SOYHLrjzK2X1ezoPC6cr"; // Anansi — the storyteller narrates
-const ELEVENLABS_TIMEOUT_MS = 25000; // 25 second timeout for TTS generation
+const ELEVENLABS_TIMEOUT_MS = 60000; // 60 second timeout — full chapters can take 30-40s
 
 export interface NarrationResult {
   audioBuffer: Buffer;

@@ -417,9 +417,9 @@ Return ONLY valid JSON with the same structure as before.`;
 
         try {
           const voiceId = "SOYHLrjzK2X1ezoPC6cr"; // Anansi's voice — the storyteller narrates
-          // ElevenLabs with 25s timeout
+          // ElevenLabs — full chapters take 30-40s, give 65s total
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 25_000);
+          const timeoutId = setTimeout(() => controller.abort(), 65_000);
 
           try {
             const narration = await generateNarration(textToNarrate, voiceId);
