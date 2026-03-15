@@ -10,5 +10,8 @@
     "test:api": "cd apps/api && bun run test",
     "deploy:api": "cd apps/api && flyctl deploy --remote-only",
     "deploy:web": "cd apps/web && vercel --prod"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.2"
   }
 }

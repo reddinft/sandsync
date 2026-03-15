@@ -1,12 +1,14 @@
 /**
  * SandSync Pipeline Demo — /pipeline-demo
  *
- * Split-screen view: Left = story form, Right = live pipeline visualisation.
+ * Split-screen view: Left = story form (type or speak), Right = live pipeline visualisation.
  * Nodes light amber when active (pulse + glow) and green when complete.
  * Arrows light up as upstream steps complete.
  *
- * Wired to real API at localhost:3002 — polls /stories/:id/status for updates.
+ * Wired to real API — polls /stories/:id/status for updates.
  * Falls back to realistic timing simulation if the story is still generating.
+ *
+ * Voice mode: MediaRecorder → POST /stories/transcribe (Deepgram STT) → approval → POST /stories/voice
  */
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -20,12 +22,14 @@ export const Route = createFileRoute("/pipeline-demo")({
 
 type StepId =
   | "user_input"
+  | "deepgram_stt"      // STT phase (voice mode only, shown as pre-step)
   | "powersync_write"
   | "mastra"
-  | "story_gen"
+  | "papa_bois"         // brief generation
+  | "story_gen"         // anansi
   | "ogma_review"
+  | "elevenlabs"        // ElevenLabs TTS narration (primary), Deepgram TTS fallback
   | "fal_images"
-  | "deepgram_tts"
   | "supabase"
   | "powersync_sync"
   | "published";
@@ -35,16 +39,39 @@ type PipelineSteps = Record<StepId, StepState>;
 
 const INITIAL_STEPS: PipelineSteps = {
   user_input: "idle",
+  deepgram_stt: "idle",
   powersync_write: "idle",
   mastra: "idle",
+  papa_bois: "idle",
   story_gen: "idle",
   ogma_review: "idle",
+  elevenlabs: "idle",
   fal_images: "idle",
-  deepgram_tts: "idle",
   supabase: "idle",
   powersync_sync: "idle",
   published: "idle",
 };
+
+type InputMode = "type" | "speak";
+type VoiceState = "idle" | "recording" | "transcribing" | "review" | "confirmed";
+
+interface TranscriptReview {
+  transcript: string;
+  confidence: number;
+  duration_ms: number;
+  audioBlob: Blob;
+}
+
+interface StoryPreview {
+  id: string;
+  title: string;
+  genre: string;
+  first_chapter: {
+    content: string;
+    image_url: string | null;
+    audio_url: string | null;
+  } | null;
+}
 
 const GENRES = [
   { label: "Anansi trickster tale", emoji: "🕷️", value: "anansi" },
@@ -126,30 +153,6 @@ function PipelineArrow({
   );
 }
 
-// Horizontal arrow for 3-column layout
-function HorizontalArrow({
-  from,
-  to,
-  steps,
-}: {
-  from: StepId;
-  to: StepId;
-  steps: PipelineSteps;
-}) {
-  const isActive =
-    steps[from] === "complete" &&
-    (steps[to] === "active" || steps[to] === "complete");
-  return (
-    <div className="flex items-center justify-center px-1">
-      <div
-        className={`h-0.5 w-4 rounded transition-colors duration-500 ${
-          isActive ? "bg-amber-400" : "bg-slate-600/40"
-        }`}
-      />
-    </div>
-  );
-}
-
 // ── Progress Label ─────────────────────────────────────────────────────────────
 
 function progressLabel(steps: PipelineSteps, currentStepMsg: string): string {
@@ -157,9 +160,11 @@ function progressLabel(steps: PipelineSteps, currentStepMsg: string): string {
   if (steps.powersync_sync === "active") return "⚡ PowerSync broadcasting to all devices...";
   if (steps.supabase === "active") return "💾 Persisting to Supabase + broadcasting real-time...";
   if (steps.supabase === "complete") return "📡 Handing off to PowerSync sync layer...";
-  if (steps.fal_images === "active" || steps.deepgram_tts === "active" || steps.story_gen === "active")
-    return "🎨 Parallel agents running — generating story, images, and voice...";
+  if (steps.elevenlabs === "active" || steps.fal_images === "active")
+    return "🎨 Parallel: ElevenLabs narrating + fal.ai generating images...";
   if (steps.ogma_review === "active") return "📜 Ogma reviewing cultural authenticity...";
+  if (steps.story_gen === "active") return "🕷️ Anansi writing the story...";
+  if (steps.papa_bois === "active") return "🌳 Papa Bois crafting the story brief...";
   if (steps.mastra === "active") return "🤖 Mastra orchestrating the agent pipeline...";
   if (steps.powersync_write === "active") return "⚡ PowerSync capturing local write (offline-first)...";
   if (steps.powersync_write === "complete") return "✅ Local write committed — starting cloud pipeline...";
@@ -169,10 +174,6 @@ function progressLabel(steps: PipelineSteps, currentStepMsg: string): string {
 
 // ── Simulation helpers ─────────────────────────────────────────────────────────
 
-/**
- * Simulates pipeline transitions with realistic timing.
- * Uses real API polling if a storyId is provided.
- */
 function usePipelineSimulation(
   storyId: string | null,
   onStepsChange: (updater: (prev: PipelineSteps) => PipelineSteps) => void
@@ -211,7 +212,6 @@ function usePipelineSimulation(
     []
   );
 
-  // Start simulation when a storyId is available
   useEffect(() => {
     if (!storyId) return;
     clearAll();
@@ -219,30 +219,32 @@ function usePipelineSimulation(
     const apiUrl =
       (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
 
-    // Step 1: powersync_write active immediately
+    // powersync_write active immediately (0ms)
     set("powersync_write", "active");
 
-    // Step 2: powersync_write complete → mastra active (800ms)
+    // powersync_write complete → mastra active (800ms)
     delay(800, () => {
       set("powersync_write", "complete");
       set("mastra", "active");
     });
 
-    // Step 3: mastra complete → parallel agents active (3.5s)
-    delay(3500, () => {
+    // mastra complete → papa_bois active (2s)
+    delay(2000, () => {
       set("mastra", "complete");
-      set("story_gen", "active");
-      set("fal_images", "active");
-      set("deepgram_tts", "active");
+      set("papa_bois", "active");
     });
 
-    // Step 4: ogma_review kicks in during story_gen (5s)
+    // papa_bois complete → story_gen active (5s)
     delay(5000, () => {
+      set("papa_bois", "complete");
+      set("story_gen", "active");
+    });
+
+    // ogma_review kicks in during story_gen (7s)
+    delay(7000, () => {
       set("ogma_review", "active");
     });
 
-    // Now poll the real API for status
-    let lastStatus = "";
     let agentsComplete = false;
 
     pollRef.current = setInterval(async () => {
@@ -260,46 +262,48 @@ function usePipelineSimulation(
         if (data.status === "complete" && !agentsComplete) {
           agentsComplete = true;
 
-          // Complete all agents
           set("story_gen", "complete");
           set("ogma_review", "complete");
-          set("fal_images", "complete");
-          set("deepgram_tts", "complete");
 
-          // Step 5: supabase active (after 200ms)
+          // After Ogma approves: parallel elevenlabs + fal_images (15-19s range)
           setTimeout(() => {
             if (!mountedRef.current) return;
-            set("supabase", "active");
+            set("elevenlabs", "active");
+            set("fal_images", "active");
 
-            // Step 6: supabase complete → powersync_sync (600ms later)
             setTimeout(() => {
               if (!mountedRef.current) return;
-              set("supabase", "complete");
-              set("powersync_sync", "active");
+              set("elevenlabs", "complete");
+              set("fal_images", "complete");
 
-              // Step 7: powersync_sync complete → published (500ms)
               setTimeout(() => {
                 if (!mountedRef.current) return;
-                set("powersync_sync", "complete");
-                set("published", "active");
+                set("supabase", "active");
+
                 setTimeout(() => {
                   if (!mountedRef.current) return;
-                  set("published", "complete");
-                  clearInterval(pollRef.current!);
-                }, 400);
-              }, 500);
-            }, 600);
+                  set("supabase", "complete");
+                  set("powersync_sync", "active");
+
+                  setTimeout(() => {
+                    if (!mountedRef.current) return;
+                    set("powersync_sync", "complete");
+                    set("published", "active");
+                    setTimeout(() => {
+                      if (!mountedRef.current) return;
+                      set("published", "complete");
+                      clearInterval(pollRef.current!);
+                    }, 400);
+                  }, 500);
+                }, 600);
+              }, 200);
+            }, 3000);
           }, 200);
         } else if (data.status === "failed") {
           clearInterval(pollRef.current!);
         } else if (data.status === "generating" && data.chapters_complete > 0 && !agentsComplete) {
-          // At least one chapter done — agents partially complete
-          // fal_images and deepgram_tts complete first (they're per-chapter)
           set("fal_images", "complete");
-          set("deepgram_tts", "complete");
         }
-
-        lastStatus = data.status;
       } catch {
         // Ignore fetch errors — keep polling
       }
@@ -312,21 +316,26 @@ function usePipelineSimulation(
         clearAll();
         set("story_gen", "complete");
         set("ogma_review", "complete");
-        set("fal_images", "complete");
-        set("deepgram_tts", "complete");
+        set("elevenlabs", "active");
+        set("fal_images", "active");
         setTimeout(() => {
           if (!mountedRef.current) return;
-          set("supabase", "active");
+          set("elevenlabs", "complete");
+          set("fal_images", "complete");
           setTimeout(() => {
             if (!mountedRef.current) return;
-            set("supabase", "complete");
-            set("powersync_sync", "active");
+            set("supabase", "active");
             setTimeout(() => {
               if (!mountedRef.current) return;
-              set("powersync_sync", "complete");
-              set("published", "complete");
-            }, 500);
-          }, 700);
+              set("supabase", "complete");
+              set("powersync_sync", "active");
+              setTimeout(() => {
+                if (!mountedRef.current) return;
+                set("powersync_sync", "complete");
+                set("published", "complete");
+              }, 500);
+            }, 700);
+          }, 3000);
         }, 200);
       }
     });
@@ -337,10 +346,6 @@ function usePipelineSimulation(
 
 // ── Standalone simulation (no API required) ────────────────────────────────────
 
-/**
- * Runs the full pipeline animation purely on timers — no API needed.
- * Used in ?demo=1 mode for reliable screencasting.
- */
 function useStandaloneSimulation(
   active: boolean,
   onStepsChange: (updater: (prev: PipelineSteps) => PipelineSteps) => void,
@@ -362,18 +367,159 @@ function useStandaloneSimulation(
     };
 
     set("powersync_write", "active");
-    after(800,  () => { set("powersync_write", "complete"); set("mastra", "active"); });
-    after(3500, () => { set("mastra", "complete"); set("story_gen", "active"); set("fal_images", "active"); set("deepgram_tts", "active"); });
-    after(5000, () => { set("ogma_review", "active"); });
-    after(12000, () => { set("fal_images", "complete"); set("deepgram_tts", "complete"); });
-    after(17000, () => { set("story_gen", "complete"); set("ogma_review", "complete"); });
-    after(17300, () => { set("supabase", "active"); });
-    after(17900, () => { set("supabase", "complete"); set("powersync_sync", "active"); });
-    after(18400, () => { set("powersync_sync", "complete"); set("published", "active"); });
-    after(18800, () => { set("published", "complete"); onComplete("demo-sim-" + Date.now()); });
+    after(800,   () => { set("powersync_write", "complete"); set("mastra", "active"); });
+    after(2000,  () => { set("mastra", "complete"); set("papa_bois", "active"); });
+    after(5000,  () => { set("papa_bois", "complete"); set("story_gen", "active"); });
+    after(7000,  () => { set("ogma_review", "active"); });
+    after(15000, () => { set("story_gen", "complete"); set("ogma_review", "complete"); set("elevenlabs", "active"); set("fal_images", "active"); });
+    after(19000, () => { set("elevenlabs", "complete"); set("fal_images", "complete"); });
+    after(19300, () => { set("supabase", "active"); });
+    after(20000, () => { set("supabase", "complete"); set("powersync_sync", "active"); });
+    after(21000, () => { set("powersync_sync", "complete"); set("published", "active"); });
+    after(21500, () => { set("published", "complete"); onComplete("demo-sim-" + Date.now()); });
 
     return () => timers.forEach(clearTimeout);
   }, [active]);
+}
+
+// ── Voice Recording Hook ───────────────────────────────────────────────────────
+
+function useVoiceRecorder() {
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [transcriptReview, setTranscriptReview] = useState<TranscriptReview | null>(null);
+  const [voiceError, setVoiceError] = useState("");
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startRecording = async (apiUrl: string) => {
+    setVoiceError("");
+    setTranscriptReview(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        stopTimer();
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setVoiceState("transcribing");
+        try {
+          const fd = new FormData();
+          fd.append("audio", blob, "recording.webm");
+          const res = await fetch(`${apiUrl}/stories/transcribe`, { method: "POST", body: fd });
+          if (!res.ok) throw new Error(`Transcription failed (${res.status})`);
+          const data = await res.json() as { transcript: string; confidence: number; duration_ms: number };
+          setTranscriptReview({ ...data, audioBlob: blob });
+          setVoiceState("review");
+        } catch (err) {
+          setVoiceError(err instanceof Error ? err.message : "Transcription failed");
+          setVoiceState("idle");
+        }
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      startTimeRef.current = Date.now();
+      setRecordingSeconds(0);
+      setVoiceState("recording");
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Mic permission denied";
+      setVoiceError(msg.includes("Permission") || msg.includes("denied") ? "Microphone permission denied. Please allow mic access and try again." : msg);
+      setVoiceState("idle");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    stopTimer();
+  };
+
+  const reset = () => {
+    stopRecording();
+    setVoiceState("idle");
+    setRecordingSeconds(0);
+    setTranscriptReview(null);
+    setVoiceError("");
+  };
+
+  return { voiceState, recordingSeconds, transcriptReview, voiceError, startRecording, stopRecording, reset, setTranscriptReview };
+}
+
+// ── Story Preview Component ────────────────────────────────────────────────────
+
+function StoryPreviewPanel({ storyId }: { storyId: string }) {
+  const [preview, setPreview] = useState<StoryPreview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
+    fetch(`${apiUrl}/stories/${storyId}/preview`)
+      .then((r) => r.json())
+      .then((d) => setPreview(d as StoryPreview))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [storyId]);
+
+  if (loading) {
+    return (
+      <div className="mt-6 bg-slate-800/40 rounded-2xl border border-slate-700/40 p-5 animate-pulse">
+        <div className="h-4 bg-slate-700/50 rounded w-1/3 mb-3" />
+        <div className="h-3 bg-slate-700/50 rounded w-2/3 mb-2" />
+        <div className="h-3 bg-slate-700/50 rounded w-1/2" />
+      </div>
+    );
+  }
+
+  if (!preview) return null;
+
+  return (
+    <div className="mt-6 bg-slate-800/40 backdrop-blur-lg rounded-2xl border border-green-500/30 p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-amber-100">{preview.title}</h3>
+          <p className="text-xs text-amber-200/50 mt-0.5 capitalize">{preview.genre}</p>
+        </div>
+        <a
+          href={`/stories/${preview.id}`}
+          className="flex-shrink-0 bg-amber-100 text-indigo-950 hover:bg-amber-200 font-semibold rounded-lg px-3 py-1.5 text-xs transition-all"
+        >
+          📖 Read Full Story →
+        </a>
+      </div>
+      {preview.first_chapter?.image_url && (
+        <img
+          src={preview.first_chapter.image_url}
+          alt="Chapter illustration"
+          className="w-full rounded-xl object-cover max-h-48"
+        />
+      )}
+      {preview.first_chapter?.content && (
+        <p className="text-sm text-amber-100/70 leading-relaxed line-clamp-4">
+          {preview.first_chapter.content}
+          {preview.first_chapter.content.length >= 300 && "…"}
+        </p>
+      )}
+      {preview.first_chapter?.audio_url && (
+        <audio controls src={preview.first_chapter.audio_url} className="w-full h-8" />
+      )}
+    </div>
+  );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -385,8 +531,8 @@ function PipelineDemoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [storyId, setStoryId] = useState<string | null>(null);
-  const [storyTitle, setStoryTitle] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
+  const [inputMode, setInputMode] = useState<InputMode>("type");
 
   // Demo mode: ?demo=1 bypasses API, runs visual simulation only
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -395,6 +541,10 @@ function PipelineDemoPage() {
   // Simulation state for ?demo=1
   const [demoSimActive, setDemoSimActive] = useState(false);
   const [demoSimComplete, setDemoSimComplete] = useState(false);
+
+  const voice = useVoiceRecorder();
+
+  const apiUrl = (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
 
   usePipelineSimulation(demoMode ? null : storyId, setSteps);
 
@@ -408,15 +558,12 @@ function PipelineDemoPage() {
     }
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const startPipeline = async (request: string) => {
     setSubmitting(true);
     setError("");
     setStoryId(null);
-    setStoryTitle(null);
     setSteps({ ...INITIAL_STEPS, user_input: "active" });
 
-    // Demo mode: skip API, run visual simulation
     if (demoMode) {
       await new Promise((r) => setTimeout(r, 400));
       setSteps((prev) => ({ ...prev, user_input: "complete" }));
@@ -426,26 +573,13 @@ function PipelineDemoPage() {
     }
 
     try {
-      const apiUrl =
-        (import.meta.env as any).VITE_API_URL || "http://localhost:3002";
-
-      // Briefly show user_input as active
       await new Promise((r) => setTimeout(r, 400));
       setSteps((prev) => ({ ...prev, user_input: "complete" }));
-
-      // Build a natural language request from genre + theme
-      const genreLabel = GENRES.find((g) => g.value === selectedGenre)?.label ?? selectedGenre;
-      const userRequest = theme
-        ? `Write a ${genreLabel} story about: ${theme}`
-        : `Write a ${genreLabel} Caribbean folklore story`;
 
       const response = await fetch(`${apiUrl}/stories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "demo-user",
-          request: userRequest,
-        }),
+        body: JSON.stringify({ userId: "demo-user", request }),
       });
 
       if (!response.ok) {
@@ -460,9 +594,59 @@ function PipelineDemoPage() {
       setStoryId(id);
       setStatusMsg("Story submitted — watching pipeline...");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to submit story"
-      );
+      setError(err instanceof Error ? err.message : "Failed to submit story");
+      setSteps(INITIAL_STEPS);
+      setSubmitting(false);
+    }
+  };
+
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const genreLabel = GENRES.find((g) => g.value === selectedGenre)?.label ?? selectedGenre;
+    const userRequest = theme
+      ? `Write a ${genreLabel} story about: ${theme}`
+      : `Write a ${genreLabel} Caribbean folklore story`;
+    await startPipeline(userRequest);
+  };
+
+  const handleVoiceConfirm = async () => {
+    if (!voice.transcriptReview) return;
+
+    setSubmitting(true);
+    setError("");
+    setStoryId(null);
+    setSteps({ ...INITIAL_STEPS, user_input: "active", deepgram_stt: "complete" });
+
+    if (demoMode) {
+      await new Promise((r) => setTimeout(r, 400));
+      setSteps((prev) => ({ ...prev, user_input: "complete" }));
+      setDemoSimActive(true);
+      setStatusMsg("Voice story submitted — watching pipeline...");
+      return;
+    }
+
+    try {
+      await new Promise((r) => setTimeout(r, 400));
+      setSteps((prev) => ({ ...prev, user_input: "complete" }));
+
+      const fd = new FormData();
+      fd.append("userId", "demo-user");
+      fd.append("audio", voice.transcriptReview.audioBlob, "recording.webm");
+
+      const response = await fetch(`${apiUrl}/stories/voice`, { method: "POST", body: fd });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API ${response.status}: ${errText.slice(0, 100)}`);
+      }
+
+      const data = (await response.json()) as { storyId?: string };
+      if (!data.storyId) throw new Error("No story ID returned from API");
+
+      setStoryId(data.storyId);
+      setStatusMsg("Story submitted — watching pipeline...");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit voice story");
       setSteps(INITIAL_STEPS);
       setSubmitting(false);
     }
@@ -471,16 +655,17 @@ function PipelineDemoPage() {
   const handleReset = () => {
     setSteps(INITIAL_STEPS);
     setStoryId(null);
-    setStoryTitle(null);
     setSubmitting(false);
     setError("");
     setStatusMsg("");
     setDemoSimActive(false);
     setDemoSimComplete(false);
+    voice.reset();
   };
 
   const isRunning = (storyId !== null || demoSimActive) && steps.published !== "complete";
   const isComplete = steps.published === "complete";
+  const voiceUsed = steps.deepgram_stt !== "idle";
 
   const currentProgress = progressLabel(steps, statusMsg);
 
@@ -492,7 +677,7 @@ function PipelineDemoPage() {
           🔗 SandSync Pipeline
         </h1>
         <p className="text-sm text-amber-200/50 mt-1">
-          Watch how PowerSync, Mastra, fal.ai, Deepgram, and Supabase all
+          Watch how PowerSync, Mastra, fal.ai, ElevenLabs, Deepgram, and Supabase all
           connect — live.
         </p>
       </div>
@@ -506,90 +691,237 @@ function PipelineDemoPage() {
               Submit a Story
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-rose-500/10 border border-rose-400/40 rounded-lg px-3 py-2 text-xs text-rose-200">
-                  {error}
-                </div>
-              )}
+            {/* Mode toggle */}
+            {!isRunning && !isComplete && (
+              <div className="flex gap-1 mb-4 bg-slate-700/40 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => { setInputMode("type"); voice.reset(); }}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-all ${
+                    inputMode === "type"
+                      ? "bg-amber-100 text-indigo-950"
+                      : "text-amber-200/60 hover:text-amber-100"
+                  }`}
+                >
+                  ✍️ Type
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode("speak")}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-all ${
+                    inputMode === "speak"
+                      ? "bg-amber-100 text-indigo-950"
+                      : "text-amber-200/60 hover:text-amber-100"
+                  }`}
+                >
+                  🎤 Speak
+                </button>
+              </div>
+            )}
 
-              {/* Genre pills */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-amber-200/70">
-                  Folklore type
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {GENRES.map((g) => (
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-400/40 rounded-lg px-3 py-2 text-xs text-rose-200 mb-4">
+                {error}
+              </div>
+            )}
+
+            {/* ── TYPE MODE ── */}
+            {(inputMode === "type" || isRunning || isComplete) && inputMode !== "speak" && (
+              <form onSubmit={handleTextSubmit} className="space-y-4">
+                {/* Genre pills */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-amber-200/70">Folklore type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {GENRES.map((g) => (
+                      <button
+                        key={g.value}
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => setSelectedGenre(g.value)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          selectedGenre === g.value
+                            ? "bg-amber-100 text-indigo-950 shadow-md shadow-amber-400/20"
+                            : "bg-slate-700/50 text-amber-100/70 border border-slate-600/40 hover:border-amber-400/40"
+                        }`}
+                      >
+                        {g.emoji} {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Theme input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-amber-200/70">
+                    Story theme
+                    <span className="text-amber-200/30 font-normal ml-1">(optional)</span>
+                  </label>
+                  <textarea
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value)}
+                    disabled={submitting}
+                    placeholder="A young hunter who discovers the forest spirit's secret..."
+                    className="w-full bg-slate-700/40 border border-slate-600/40 text-amber-100 placeholder-amber-200/25 rounded-lg px-3 py-2 text-xs resize-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 transition-all min-h-[80px]"
+                    maxLength={200}
+                  />
+                </div>
+
+                {/* Submit / Reset */}
+                {!isComplete && !isRunning ? (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-amber-100 text-indigo-950 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold rounded-lg px-4 py-3 text-sm transition-all"
+                  >
+                    {submitting && !storyId ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin">⌛</span> Submitting...
+                      </span>
+                    ) : (
+                      "▶ Run Pipeline"
+                    )}
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    {isComplete && storyId && !storyId.startsWith("demo-") && (
+                      <a
+                        href={`/stories/${storyId}`}
+                        className="block w-full text-center bg-green-500/20 border border-green-400/50 text-green-100 hover:bg-green-500/30 font-semibold rounded-lg px-4 py-3 text-sm transition-all"
+                      >
+                        📖 View Story →
+                      </a>
+                    )}
                     <button
-                      key={g.value}
                       type="button"
-                      disabled={submitting}
-                      onClick={() => setSelectedGenre(g.value)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        selectedGenre === g.value
-                          ? "bg-amber-100 text-indigo-950 shadow-md shadow-amber-400/20"
-                          : "bg-slate-700/50 text-amber-100/70 border border-slate-600/40 hover:border-amber-400/40"
+                      onClick={handleReset}
+                      className="w-full bg-slate-700/50 border border-slate-600/40 text-amber-200/70 hover:border-amber-400/40 font-medium rounded-lg px-4 py-2.5 text-sm transition-all"
+                    >
+                      ↺ Run Again
+                    </button>
+                  </div>
+                )}
+              </form>
+            )}
+
+            {/* ── SPEAK MODE ── */}
+            {inputMode === "speak" && !isRunning && !isComplete && (
+              <div className="space-y-4">
+                {/* Genre pills */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-amber-200/70">Folklore type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {GENRES.map((g) => (
+                      <button
+                        key={g.value}
+                        type="button"
+                        disabled={voice.voiceState !== "idle"}
+                        onClick={() => setSelectedGenre(g.value)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          selectedGenre === g.value
+                            ? "bg-amber-100 text-indigo-950 shadow-md shadow-amber-400/20"
+                            : "bg-slate-700/50 text-amber-100/70 border border-slate-600/40 hover:border-amber-400/40"
+                        }`}
+                      >
+                        {g.emoji} {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {voice.voiceError && (
+                  <div className="bg-rose-500/10 border border-rose-400/40 rounded-lg px-3 py-2 text-xs text-rose-200">
+                    {voice.voiceError}
+                  </div>
+                )}
+
+                {/* Idle or Recording state */}
+                {(voice.voiceState === "idle" || voice.voiceState === "recording") && (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        voice.voiceState === "idle"
+                          ? voice.startRecording(apiUrl)
+                          : voice.stopRecording()
+                      }
+                      className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all font-medium shadow-lg ${
+                        voice.voiceState === "recording"
+                          ? "bg-rose-500 hover:bg-rose-400 shadow-rose-500/40 animate-pulse scale-110"
+                          : "bg-amber-100 hover:bg-amber-200 text-indigo-950 shadow-amber-400/20"
                       }`}
                     >
-                      {g.emoji} {g.label}
+                      {voice.voiceState === "recording" ? "⏹" : "🎤"}
                     </button>
-                  ))}
-                </div>
-              </div>
+                    {voice.voiceState === "recording" ? (
+                      <p className="text-xs text-rose-300 font-medium">
+                        Recording... {Math.floor(voice.recordingSeconds / 60)}:{String(voice.recordingSeconds % 60).padStart(2, "0")}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-200/50">Click to start recording</p>
+                    )}
+                  </div>
+                )}
 
-              {/* Theme input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-amber-200/70">
-                  Story theme
-                  <span className="text-amber-200/30 font-normal ml-1">
-                    (optional)
-                  </span>
-                </label>
-                <textarea
-                  value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
-                  disabled={submitting}
-                  placeholder="A young hunter who discovers the forest spirit's secret..."
-                  className="w-full bg-slate-700/40 border border-slate-600/40 text-amber-100 placeholder-amber-200/25 rounded-lg px-3 py-2 text-xs resize-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 transition-all min-h-[80px]"
-                  maxLength={200}
-                />
-              </div>
+                {/* Transcribing state */}
+                {voice.voiceState === "transcribing" && (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center text-2xl animate-spin">
+                      ⌛
+                    </div>
+                    <p className="text-xs text-amber-300">Deepgram transcribing your audio...</p>
+                  </div>
+                )}
 
-              {/* Submit / Reset */}
-              {!isComplete && !isRunning ? (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-amber-100 text-indigo-950 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold rounded-lg px-4 py-3 text-sm transition-all"
-                >
-                  {submitting && !storyId ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⌛</span> Submitting...
-                    </span>
-                  ) : (
-                    "▶ Run Pipeline"
-                  )}
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  {isComplete && storyId && (
-                    <a
-                      href={`/stories/${storyId}`}
-                      className="block w-full text-center bg-green-500/20 border border-green-400/50 text-green-100 hover:bg-green-500/30 font-semibold rounded-lg px-4 py-3 text-sm transition-all"
-                    >
-                      📖 View Story →
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="w-full bg-slate-700/50 border border-slate-600/40 text-amber-200/70 hover:border-amber-400/40 font-medium rounded-lg px-4 py-2.5 text-sm transition-all"
-                  >
-                    ↺ Run Again
-                  </button>
-                </div>
-              )}
-            </form>
+                {/* Review state */}
+                {voice.voiceState === "review" && voice.transcriptReview && (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-amber-200/70">📝 Deepgram heard:</label>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          voice.transcriptReview.confidence > 0.85
+                            ? "bg-green-500/20 text-green-300"
+                            : voice.transcriptReview.confidence > 0.6
+                            ? "bg-amber-500/20 text-amber-300"
+                            : "bg-rose-500/20 text-rose-300"
+                        }`}>
+                          {Math.round(voice.transcriptReview.confidence * 100)}% confidence
+                        </span>
+                      </div>
+                      <textarea
+                        value={voice.transcriptReview.transcript}
+                        onChange={(e) =>
+                          voice.setTranscriptReview({ ...voice.transcriptReview!, transcript: e.target.value })
+                        }
+                        className="w-full bg-slate-700/40 border border-amber-400/30 text-amber-100 rounded-lg px-3 py-2 text-xs resize-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 transition-all min-h-[70px]"
+                      />
+                      <p className="text-[10px] text-amber-200/30 mt-1">
+                        {voice.transcriptReview.duration_ms > 0
+                          ? `${(voice.transcriptReview.duration_ms / 1000).toFixed(1)}s audio`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleVoiceConfirm}
+                        disabled={submitting}
+                        className="flex-1 bg-green-500/20 border border-green-400/50 text-green-100 hover:bg-green-500/30 font-medium rounded-lg px-3 py-2 text-xs transition-all disabled:opacity-50"
+                      >
+                        ✅ Use this
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => voice.reset()}
+                        className="flex-1 bg-slate-700/50 border border-slate-600/40 text-amber-200/70 hover:border-amber-400/40 font-medium rounded-lg px-3 py-2 text-xs transition-all"
+                      >
+                        🔄 Re-record
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tech stack legend */}
@@ -602,18 +934,15 @@ function PipelineDemoPage() {
               { icon: "🤖", name: "Mastra", desc: "AI agent orchestration" },
               { icon: "🕷️", name: "Claude Haiku", desc: "Story + review agents" },
               { icon: "🎨", name: "fal.ai FLUX", desc: "Chapter illustrations" },
-              { icon: "🎤", name: "Deepgram", desc: "Voice narration (TTS)" },
+              { icon: "🎤", name: "Deepgram", desc: "Speech-to-text (STT input)" },
+              { icon: "🔊", name: "ElevenLabs", desc: "Voice narration (TTS output)" },
               { icon: "🗄️", name: "Supabase", desc: "Postgres + real-time" },
             ].map((t) => (
               <div key={t.name} className="flex items-center gap-2.5">
                 <span className="text-sm">{t.icon}</span>
                 <div>
-                  <span className="text-xs font-medium text-amber-100/80">
-                    {t.name}
-                  </span>
-                  <span className="text-amber-200/35 text-[10px] ml-1.5">
-                    {t.desc}
-                  </span>
+                  <span className="text-xs font-medium text-amber-100/80">{t.name}</span>
+                  <span className="text-amber-200/35 text-[10px] ml-1.5">{t.desc}</span>
                 </div>
               </div>
             ))}
@@ -640,6 +969,20 @@ function PipelineDemoPage() {
                 </span>
               )}
             </div>
+
+            {/* Pre-step: Deepgram STT (voice mode only) */}
+            {voiceUsed && (
+              <>
+                <PipelineNode
+                  id="deepgram_stt"
+                  icon="🎤"
+                  label="Deepgram STT"
+                  sub="Transcribes spoken request → text (voice mode)"
+                  steps={steps}
+                />
+                <PipelineArrow from="deepgram_stt" to="user_input" steps={steps} />
+              </>
+            )}
 
             {/* Node: User Input */}
             <PipelineNode
@@ -668,53 +1011,76 @@ function PipelineDemoPage() {
               id="mastra"
               icon="🤖"
               label="Mastra Orchestrator"
-              sub="Papa Bois agent parses request → story brief"
+              sub="Kicks off multi-agent story pipeline"
               steps={steps}
             />
 
-            <PipelineArrow from="mastra" to="story_gen" steps={steps} />
+            <PipelineArrow from="mastra" to="papa_bois" steps={steps} />
 
-            {/* ── Parallel agents row ─────────────────────────────── */}
+            {/* Node: Papa Bois */}
+            <PipelineNode
+              id="papa_bois"
+              icon="🌳"
+              label="Papa Bois"
+              sub="Brief generation — chapter plan + folklore context"
+              steps={steps}
+            />
+
+            <PipelineArrow from="papa_bois" to="story_gen" steps={steps} />
+
+            {/* ── Per-chapter loop ─────────────────────────────── */}
             <div className="rounded-xl border border-slate-600/30 bg-slate-900/30 p-2.5 space-y-2">
               <p className="text-[9px] text-amber-200/30 uppercase tracking-widest font-semibold ml-1">
-                Parallel Agents
+                Per Chapter Loop
               </p>
 
-              {/* Row 1: Story Gen + fal.ai + Deepgram */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Story Gen ⟷ Ogma review cycle */}
+              <div className="grid grid-cols-2 gap-2">
                 <PipelineNode
                   id="story_gen"
                   icon="🕷️"
-                  label="Story Generator"
-                  sub="Anansi (Claude Haiku)"
+                  label="Anansi"
+                  sub="Story writer (Claude Haiku)"
                   steps={steps}
                 />
                 <PipelineNode
-                  id="fal_images"
-                  icon="🎨"
-                  label="fal.ai Images"
-                  sub="FLUX illustrations"
-                  steps={steps}
-                />
-                <PipelineNode
-                  id="deepgram_tts"
-                  icon="🎤"
-                  label="Deepgram TTS"
-                  sub="Voice narration"
+                  id="ogma_review"
+                  icon="📜"
+                  label="Ogma"
+                  sub="LLM-as-judge · up to 3 revisions"
                   steps={steps}
                 />
               </div>
 
-              {/* Row 2: Ogma Review (under Story Gen) */}
-              <div className="grid grid-cols-3 gap-2">
-                <PipelineNode
-                  id="ogma_review"
-                  icon="📜"
-                  label="Ogma Review"
-                  sub="LLM-as-judge quality gate"
-                  steps={steps}
-                />
-                <div className="col-span-2" /> {/* spacer */}
+              {/* Arrow down from Ogma approval to parallel block */}
+              <div className="flex items-center justify-center py-0.5">
+                <div className={`w-0.5 h-4 rounded transition-colors duration-500 ${
+                  steps.ogma_review === "complete" && (steps.elevenlabs === "active" || steps.elevenlabs === "complete")
+                    ? "bg-amber-400" : "bg-slate-600/40"
+                }`} />
+              </div>
+
+              {/* Parallel: ElevenLabs + fal.ai (after Ogma approves) */}
+              <div className="rounded-lg border border-slate-600/20 bg-slate-800/20 p-2 space-y-1.5">
+                <p className="text-[9px] text-amber-200/20 uppercase tracking-widest font-semibold ml-1">
+                  Parallel (post-approval)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <PipelineNode
+                    id="elevenlabs"
+                    icon="🔊"
+                    label="ElevenLabs"
+                    sub="Voice narration TTS (Devi agent)"
+                    steps={steps}
+                  />
+                  <PipelineNode
+                    id="fal_images"
+                    icon="🎨"
+                    label="fal.ai FLUX"
+                    sub="Chapter illustrations"
+                    steps={steps}
+                  />
+                </div>
               </div>
             </div>
 
@@ -722,7 +1088,7 @@ function PipelineDemoPage() {
             <div className="flex items-center justify-center py-0.5">
               <div
                 className={`w-0.5 h-4 rounded transition-colors duration-500 ${
-                  (steps.story_gen === "complete" || steps.ogma_review === "complete") &&
+                  (steps.elevenlabs === "complete" || steps.fal_images === "complete") &&
                   (steps.supabase === "active" || steps.supabase === "complete")
                     ? "bg-amber-400"
                     : "bg-slate-600/40"
@@ -777,6 +1143,11 @@ function PipelineDemoPage() {
               )}
             </div>
           </div>
+
+          {/* Story Preview Panel (after completion) */}
+          {isComplete && storyId && !storyId.startsWith("demo-") && (
+            <StoryPreviewPanel storyId={storyId} />
+          )}
         </div>
       </div>
     </div>

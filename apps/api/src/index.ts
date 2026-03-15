@@ -53,23 +53,9 @@ function badRequest(msg: string, corsHeaders?: Record<string, string>) {
 // ── Handlers ───────────────────────────────────────────────────────────────────
 
 async function handlePostStory(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
-  let body: { userId?: string; request?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return badRequest("Invalid JSON body", corsHeaders);
-  }
-
   const { userId, request: userRequest } = body;
   if (!userId) return badRequest("userId is required", corsHeaders);
   if (!userRequest) return badRequest("request is required", corsHeaders);
-
-  // Create story row (status: queued)
-  const { data: story, error } = await supabase
-    .from("stories")
-    .insert({ user_id: userId, status: "queued" })
-    .select()
-    .single();
 
   if (error || !story) {
     console.error("[POST /stories] DB error:", error?.message);
@@ -190,6 +176,69 @@ async function handleGetAudio(storyId: string, chapterNum: number, corsHeaders: 
   }
 }
 
+async function handlePostStoryTranscribe(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
+  if (!process.env.DEEPGRAM_API_KEY) {
+    return json({ error: "voice_unavailable" }, 503, corsHeaders);
+  }
+
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return badRequest("Expected multipart/form-data", corsHeaders);
+  }
+
+  const audioFile = formData.get("audio");
+  if (!audioFile || !(audioFile instanceof Blob)) {
+    return badRequest("audio field (audio blob) is required", corsHeaders);
+  }
+
+  const mimeType = audioFile.type || "audio/webm";
+  const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+
+  const transcriptResult = await transcribeAudio(audioBuffer, mimeType);
+  if (!transcriptResult) {
+    return json({ error: "transcription_failed" }, 502, corsHeaders);
+  }
+
+  return json({
+    transcript: transcriptResult.transcript,
+    confidence: transcriptResult.confidence,
+    duration_ms: transcriptResult.audio_duration_ms,
+  }, 200, corsHeaders);
+}
+
+async function handleGetStoryPreview(storyId: string, corsHeaders: Record<string, string>): Promise<Response> {
+  const { data: story, error } = await supabase
+    .from("stories")
+    .select("id, title, genre, status")
+    .eq("id", storyId)
+    .single();
+
+  if (error || !story) return notFound(corsHeaders);
+
+  const { data: chapter } = await supabase
+    .from("story_chapters")
+    .select("content, image_url, audio_url")
+    .eq("story_id", storyId)
+    .order("chapter_number", { ascending: true })
+    .limit(1)
+    .single();
+
+  return json({
+    id: story.id,
+    title: story.title ?? "Untitled Story",
+    genre: story.genre ?? "folklore",
+    first_chapter: chapter
+      ? {
+          content: (chapter.content ?? "").slice(0, 300),
+          image_url: chapter.image_url ?? null,
+          audio_url: chapter.audio_url ?? null,
+        }
+      : null,
+  }, 200, corsHeaders);
+}
+
 async function handlePostStoryVoice(req: Request, corsHeaders: Record<string, string>): Promise<Response> {
   // Check Deepgram is configured before parsing body
   if (!process.env.DEEPGRAM_API_KEY) {
@@ -298,6 +347,10 @@ const server = Bun.serve({
         return await handlePostStoryVoice(req, corsHeaders);
       }
 
+      if (pathname === "/stories/transcribe" && method === "POST") {
+        return await handlePostStoryTranscribe(req, corsHeaders);
+      }
+
       if (pathname === "/stories" && method === "POST") {
         return await handlePostStory(req, corsHeaders);
       }
@@ -305,6 +358,11 @@ const server = Bun.serve({
       const statusMatch = pathname.match(/^\/stories\/([^/]+)\/status$/);
       if (statusMatch && method === "GET") {
         return await handleGetStoryStatus(statusMatch[1], corsHeaders);
+      }
+
+      const previewMatch = pathname.match(/^\/stories\/([^/]+)\/preview$/);
+      if (previewMatch && method === "GET") {
+        return await handleGetStoryPreview(previewMatch[1], corsHeaders);
       }
 
       // GET /stories/:id/chapters/:n/audio
