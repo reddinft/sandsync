@@ -1,0 +1,120 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - navigation [ref=e5]:
+      - link "🌴 SandSync" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - generic [ref=e8]: Caribbean Folklore AI · PowerSync AI Hackathon 2026
+        - generic "Offline — using local SQLite cache" [ref=e9]: ○ Offline — local SQLite
+        - link "🏗️ demo" [ref=e11] [cursor=pointer]:
+          - /url: /demo
+        - link "🌴 Showcase" [ref=e12] [cursor=pointer]:
+          - /url: /showcase
+        - link "🔗 Pipeline" [ref=e13] [cursor=pointer]:
+          - /url: /pipeline-demo
+  - main [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - heading "🌴 Story Showcase" [level=1] [ref=e17]
+        - paragraph [ref=e18]: 8 stories — Previously generated Caribbean folklore
+      - generic [ref=e19]:
+        - generic [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]:
+            - 'img "The Fisherman''s Bargain: What Mama Dlo Takes" [ref=e22]'
+            - generic [ref=e23]: Anansi Trickster Tale with River Spirit Folklore
+          - generic [ref=e24]:
+            - 'heading "The Fisherman''s Bargain: What Mama Dlo Takes" [level=3] [ref=e25]'
+            - paragraph [ref=e26]: "\"Listen now, and I will tell you true: Ezekiel was not always a man who spoke to spirits. Before grief bent his back like the mangrove roots that twist…\""
+            - generic [ref=e27]:
+              - button "▶ Play" [ref=e28]
+              - link "📖 Read" [ref=e29]:
+                - /url: /stories/45efd1b9-87b7-4cc8-ae8a-931abeeb9c8b
+              - generic [ref=e30]: 16 Mar 2026
+        - generic [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]:
+            - img "The Last Fare" [ref=e33]
+            - generic [ref=e34]: La Diablesse encounter / supernatural warning tale
+          - generic [ref=e35]:
+            - heading "The Last Fare" [level=3] [ref=e36]
+            - paragraph [ref=e37]: "\"Listen now. Listen good. Because this is a story about Marcus Alleyne, and how close he came to never reaching home. The dashboard clock said 6:47 whe…\""
+            - generic [ref=e38]:
+              - button "▶ Play" [ref=e39]
+              - link "📖 Read" [ref=e40]:
+                - /url: /stories/c8e42300-958a-4f17-bc7c-0de42906594f
+              - generic [ref=e41]: 15 Mar 2026
+        - generic [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]:
+            - img "The Voice of Mama Dlo" [ref=e44]
+            - generic [ref=e45]: Caribbean river spirit folklore
+          - generic [ref=e46]:
+            - heading "The Voice of Mama Dlo" [level=3] [ref=e47]
+            - paragraph [ref=e48]: "\"Listen now, and I will tell you about the evening Amara went down to the Caroni with her grandmother's clay pot balanced on her head and fear sitting …\""
+            - generic [ref=e49]:
+              - button "▶ Play" [ref=e50]
+              - link "📖 Read" [ref=e51]:
+                - /url: /stories/33bc0729-9bf0-454a-9c22-a4158d3ff02f
+              - generic [ref=e52]: 15 Mar 2026
+        - generic [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]:
+            - img "Anansi and the Lion's Stolen Thunder" [ref=e55]
+            - generic [ref=e56]: Anansi Trickster Tale with West African-Caribbean fusion
+          - generic [ref=e57]:
+            - heading "Anansi and the Lion's Stolen Thunder" [level=3] [ref=e58]
+            - paragraph [ref=e59]: "\"Listen now, and I go tell you how it was in the days when the Lion still had his roar. The sun was dropping low over Trinidad's borderlands, where the…\""
+            - generic [ref=e60]:
+              - button "▶ Play" [ref=e61]
+              - link "📖 Read" [ref=e62]:
+                - /url: /stories/8a1b6e07-c2fd-49a6-b3ca-1d4dd1b84533
+              - generic [ref=e63]: 15 Mar 2026
+        - generic [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]:
+            - img "The Parrot's Message" [ref=e66]
+            - generic [ref=e67]: Caribbean Spirit Tale with Animal Wisdom
+          - generic [ref=e68]:
+            - heading "The Parrot's Message" [level=3] [ref=e69]
+            - paragraph [ref=e70]: "\"Marcus wipe the grease from his hands with a rag that was more oil than cloth, watching the sun crack open the sky over the Caroni plains. Five-thirty…\""
+            - generic [ref=e71]:
+              - button "▶ Play" [ref=e72]
+              - link "📖 Read" [ref=e73]:
+                - /url: /stories/888b6736-ce03-4d4c-941f-7ea3ee3e48f2
+              - generic [ref=e74]: 15 Mar 2026
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]:
+            - img "The Girl Between the Silk Cotton Trees" [ref=e77]
+            - generic [ref=e78]: Caribbean folklore mystery with supernatural revelation
+          - generic [ref=e79]:
+            - heading "The Girl Between the Silk Cotton Trees" [level=3] [ref=e80]
+            - paragraph [ref=e81]: "\"Listen now, and I tell you true—the forest does not forgive those who forget to listen. Jamal's mother had warned him that morning, same as she warn …\""
+            - generic [ref=e82]:
+              - button "▶ Play" [ref=e83]
+              - link "📖 Read" [ref=e84]:
+                - /url: /stories/f0edceb5-d90d-4ff1-99b0-f92e68191271
+              - generic [ref=e85]: 15 Mar 2026
+        - generic [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]:
+            - img "The Waterfall's Blessing" [ref=e88]
+            - generic [ref=e89]: Papa Bois Guardian Spirit Tale
+          - generic [ref=e90]:
+            - heading "The Waterfall's Blessing" [level=3] [ref=e91]
+            - paragraph [ref=e92]: "\"Listen now, and I tell you true—the morning Karim walk into the Northern Range with his cutlass sharp and his belly full of yesterday's catch, the for…\""
+            - generic [ref=e93]:
+              - button "▶ Play" [ref=e94]
+              - link "📖 Read" [ref=e95]:
+                - /url: /stories/97105ad2-ef67-401a-a125-499bfc4815f7
+              - generic [ref=e96]: 15 Mar 2026
+        - generic [ref=e97] [cursor=pointer]:
+          - generic [ref=e98]:
+            - img "The Mahogany Boundary" [ref=e99]
+            - generic [ref=e100]: Caribbean forest spirit folklore - Papa Bois guardian tale
+          - generic [ref=e101]:
+            - heading "The Mahogany Boundary" [level=3] [ref=e102]
+            - paragraph [ref=e103]: "\"Listen now, and I tell you true — the blue hour come early that day, when the sky turn the color of old bruises and the forest start to breathe differ…\""
+            - generic [ref=e104]:
+              - button "▶ Play" [ref=e105]
+              - link "📖 Read" [ref=e106]:
+                - /url: /stories/c2165ace-3d9c-4e13-8423-10fbec8f86a9
+              - generic [ref=e107]: 14 Mar 2026
+```
